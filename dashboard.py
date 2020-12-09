@@ -1,33 +1,37 @@
-''' dashboard for DJI Mavic Pro
+''' module dashboard for DJI Mavic Pro
 '''
 import re
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
+from rc_io import read_flightdata_csv
 
-fig_size = (5, 8)
+rc_filename = 'Oct-27th-2020-12-05PM-Flight-Airdata.csv'
+fig_size = (5, 5)
 stick_end_color = 'red'
 stick_end_size = 5
 stick_color = 'blue'
 stick_width = 5
 bar_color = 'orange'
-bar_width = 20
+bar_width = 10
 initial_theta = 0
 initial_r = 0
+rc_max = 1684
+rc_min = 364
+rc_zero = 1024
 
 def conv_polar_to_xy(theta, r):
     return r*np.cos(theta), r*np.sin(theta)
 
 
 def conv_xy_to_polar(x, y):
-    return np.arctan2(y, x), np.sqrt(x*x + y*y)
+    return np.degrees(np.arctan2(y, x)), np.sqrt(x*x + y*y)
 
 
 class RcStick:
 
     def __init__(self, stick_name, rmax):
-        self.stick_name = stick_name
         self.rmax = rmax
         rect_carth_offs = 0.15
         rect_polar_offs = 0.075
@@ -51,6 +55,7 @@ class RcStick:
             ylim=(-self.cf*self.rmax, self.cf*self.rmax),
             aspect='equal'
         )
+        self.bv = self.rmax * self.cf
         # axis ticks
         ticks = np.arange(0, self.cf*rmax, tick_intval)
         ticks = sorted(np.append(-ticks[1:], ticks))
@@ -88,23 +93,23 @@ class RcStick:
         self.ax_carth.add_line(self.bar_y)
         self.bar_val(initial_theta, initial_r)
 
+        self.ax_carth.set_title(stick_name)
+        self.ax_polar.set_yticklabels([])
+
     def blit(self):
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-    def stick_val(self, theta, r):
-        self.stick_end.center = conv_polar_to_xy(np.radians(theta), r)
+    def stick_val(self, x, y):
+        theta, r = conv_xy_to_polar(x, y)
+        self.stick_end.center = (x, y)
         self.stick.set_data([0, np.radians(theta)], [0, r])
 
-    def bar_val(self, theta, r):
-        x, y = conv_polar_to_xy(np.radians(theta), r)
-        print(f'x={x}, y={y}')
-        # plot the x and y values on the border of the graph
-        bv = self.rmax * self.cf
+    def bar_val(self, x, y):
         # from (0, -bv) to (x, -bv)
-        self.bar_x.set_data([0, x], [-bv, -bv])
+        self.bar_x.set_data([0, x], [-self.bv, -self.bv])
         # from (bv, 0) to (bv, y)
-        self.bar_y.set_data([bv, bv], [0, y])
+        self.bar_y.set_data([-self.bv, -self.bv], [0, y])
 
     def on_key(self, event):
         if event.key == ' ':
@@ -114,12 +119,47 @@ class RcStick:
     def input_vals(self):
         answer = input('Give theta (degrees), radius: ')
         theta, r = (float(a) for a in re.split(r'\s|, ', answer))
-        self.stick_val(theta, r)
-        self.bar_val(theta, r)
+        x, y = conv_polar_to_xy(np.radians(theta), r)
+        self.stick_val(x, y)
+        self.bar_val(x, y)
+
+    def rc_vals(self, val1, val2):
+        self.stick_val(val1, val2)
+        self.bar_val(val1, val2)
+
 
 if __name__ == '__main__':
     plt.ion()
-    rc_left = RcStick('throttle', 80)
-    while True:
-        rc_left.input_vals()
-        rc_left.blit()
+    flightdata_df = read_flightdata_csv(rc_filename)
+    rc_climb = np.array(flightdata_df['rc_throttle'].to_list(), dtype=np.float64)
+    rc_yaw = np.array(flightdata_df['rc_rudder'].to_list(), dtype=np.float64)
+    # normalize axises * 100
+    rc_climb -= rc_zero
+    rc_climb /= 0.01 * (rc_max - rc_zero)
+    rc_yaw -= rc_zero
+    rc_yaw /= 0.01 * (rc_max - rc_zero)
+
+    rc_pitch = np.array(flightdata_df['rc_elevator'].to_list(), dtype=np.float64)
+    rc_roll = np.array(flightdata_df['rc_aileron'].to_list(), dtype=np.float64)
+    # normalize axises * 100
+    rc_pitch -= rc_zero
+    rc_pitch /= 0.01 * (rc_max - rc_zero)
+    rc_roll -= rc_zero
+    rc_roll /= 0.01 * (rc_max - rc_zero)
+
+    rc_left = RcStick('climb/ yaw', 120)
+    rc_right = RcStick('pitch/ roll', 120)
+    input('start')
+    for i, (climb, yaw, pitch, roll)  in enumerate(
+            zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
+        if i % 10 == 0:
+            rc_left.rc_vals(yaw, climb)
+            rc_left.blit()
+            rc_right.rc_vals(roll, pitch)
+            rc_right.blit()
+            print(
+                f'time: {i:5}, climb: {climb:10.4f}, yaw: {yaw:10.4f}, '
+                f'pitch: {pitch:10.4f}, roll: {roll:10.4f}'
+            )
+
+    input('finish')
