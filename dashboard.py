@@ -2,13 +2,14 @@
 '''
 import re
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
 from rc_io import read_flightdata_csv
 
 rc_filename = 'Oct-27th-2020-12-05PM-Flight-Airdata.csv'
-fig_size = (5, 5)
+fig_size = (10, 5)
 stick_end_color = 'red'
 stick_end_size = 5
 stick_color = 'blue'
@@ -29,45 +30,83 @@ def conv_xy_to_polar(x, y):
     return np.degrees(np.arctan2(y, x)), np.sqrt(x*x + y*y)
 
 
-class RcStick:
+class RemoteControlDisplay:
+    def __init__(self, rmax):
+        self._rmax = rmax
+        mpl.rcParams['toolbar'] = 'None'
+        self.rc_fig = plt.figure('Remote Control', figsize=fig_size)
+        self.rc_fig.suptitle(None)
+        connect = self.rc_fig.canvas.mpl_connect
+        connect('key_press_event', self.on_key)
 
-    def __init__(self, stick_name, rmax):
-        self.rmax = rmax
-        rect_carth_offs = 0.15
+    def on_key(self, event):
+        if event.key == ' ':
+            # TODO add pause function on pressing space
+            print('Hallo ....')
+
+    def blit(self):
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    @property
+    def fig(self):
+        return self.rc_fig
+
+    @property
+    def rmax(self):
+        return  self._rmax
+
+
+class RcStick():
+
+    def __init__(self, fig, rmax, stick_name, left=True):
+        rect_carth_offs = 0.050
         rect_polar_offs = 0.075
         tick_intval = 20
 
-        self.fig = plt.figure(figsize=fig_size)
-        connect = self.fig.canvas.mpl_connect
-        connect('key_press_event', self.on_key)
+        if left:
+            rect_carth = [
+                rect_carth_offs, rect_carth_offs,
+                0.5-rect_carth_offs, 1 - 2*rect_carth_offs
+            ]
+            rect_polar = [
+                rect_carth[0] + 0.5*rect_polar_offs, rect_carth[1] + rect_polar_offs,
+                rect_carth[2] - 1*rect_polar_offs, rect_carth[3] - 2*rect_polar_offs
+            ]
+
+        else:
+            rect_carth = [
+                0.25+2*rect_carth_offs, rect_carth_offs,
+                1-4*rect_carth_offs, 1 - 2*rect_carth_offs
+            ]
+            rect_polar = [
+                rect_carth[0] + rect_polar_offs, rect_carth[1] + rect_polar_offs,
+                rect_carth[2] - 2*rect_polar_offs, rect_carth[3] - 2*rect_polar_offs
+            ]
 
         # place carthesian grid in fig
-        rect = [
-            rect_carth_offs, rect_carth_offs,
-            1-2*rect_carth_offs, 1 - 2*rect_carth_offs
-        ]
-        self.ax_carth = self.fig.add_axes(rect)
+        self.ax_carth = fig.add_axes(rect_carth)
 
         # adjust x, y limits to match the one on the polar plot
         self.cf = (1-2*rect_carth_offs) / (1-2*rect_carth_offs-2*rect_polar_offs)
         self.ax_carth.set(
-            xlim=(-self.cf*self.rmax, self.cf*self.rmax),
-            ylim=(-self.cf*self.rmax, self.cf*self.rmax),
+            xlim=(-self.cf*rmax, self.cf*rmax),
+            ylim=(-self.cf*rmax, self.cf*rmax),
             aspect='equal'
         )
-        self.bv = self.rmax * self.cf
+        self.bv = rmax * self.cf
         # axis ticks
         ticks = np.arange(0, self.cf*rmax, tick_intval)
         ticks = sorted(np.append(-ticks[1:], ticks))
+        if left:
+            self.ax_carth.set_yticks(ticks)
+
+        else:
+            self.ax_carth.set_yticks([])
         self.ax_carth.set_xticks(ticks)
-        self.ax_carth.set_yticks(ticks)
 
         # place polar grid in carthesian grid
-        rect = [
-            rect[0] + rect_polar_offs, rect[1] + rect_polar_offs,
-            rect[2] - 2*rect_polar_offs, rect[3] - 2*rect_polar_offs
-        ]
-        self.ax_polar = self.fig.add_axes(rect, polar=True, frameon=False)
+        self.ax_polar = fig.add_axes(rect_polar, polar=True, frameon=False)
         self.ax_polar.set_rmax(rmax)
 
         # display of stick
@@ -96,10 +135,6 @@ class RcStick:
         self.ax_carth.set_title(stick_name)
         self.ax_polar.set_yticklabels([])
 
-    def blit(self):
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-
     def stick_val(self, x, y):
         theta, r = conv_xy_to_polar(x, y)
         self.stick_end.center = (x, y)
@@ -111,10 +146,6 @@ class RcStick:
         # from (bv, 0) to (bv, y)
         self.bar_y.set_data([-self.bv, -self.bv], [0, y])
 
-    def on_key(self, event):
-        if event.key == ' ':
-            self.input_vals()
-            self.blit()
 
     def input_vals(self):
         answer = input('Give theta (degrees), radius: ')
@@ -147,16 +178,18 @@ if __name__ == '__main__':
     rc_roll -= rc_zero
     rc_roll /= 0.01 * (rc_max - rc_zero)
 
-    rc_left = RcStick('climb/ yaw', 120)
-    rc_right = RcStick('pitch/ roll', 120)
+    rc = RemoteControlDisplay(120)
+    rc_left = RcStick(rc.fig, rc.rmax, 'climb/ yaw', left=True)
+    rc_right = RcStick(rc.fig, rc.rmax, 'pitch/ roll', left=False)
     input('start')
     for i, (climb, yaw, pitch, roll)  in enumerate(
             zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
-        if i % 10 == 0:
+        if i % 20 == 0:
             rc_left.rc_vals(yaw, climb)
-            rc_left.blit()
             rc_right.rc_vals(roll, pitch)
-            rc_right.blit()
+            rc.blit()
+
+        if i % 100 == 0:
             print(
                 f'time: {i:5}, climb: {climb:10.4f}, yaw: {yaw:10.4f}, '
                 f'pitch: {pitch:10.4f}, roll: {roll:10.4f}'
