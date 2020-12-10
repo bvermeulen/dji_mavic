@@ -15,7 +15,10 @@ def read_flightdata_csv(file_name: str):
         returns:
             pandas df
     '''
-    return pd.read_csv(file_name)
+    flightdata_df = pd.read_csv(file_name)
+    process = psutil.Process(os.getpid())
+    print(process, f': {process.memory_info().rss:,}')
+    return flightdata_df
 
 def main():
     fd_df = read_flightdata_csv(filename)

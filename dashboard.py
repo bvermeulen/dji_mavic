@@ -184,12 +184,15 @@ if __name__ == '__main__':
     input('start')
     for i, (climb, yaw, pitch, roll)  in enumerate(
             zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
-        if i % 20 == 0:
+
+        # blot diplay for every second of the flight (10 x 100 ms)
+        # nominal there may be gaps if reception is poor
+        if i % 10 == 0:
             rc_left.rc_vals(yaw, climb)
             rc_right.rc_vals(roll, pitch)
             rc.blit()
 
-        if i % 100 == 0:
+        if i % 10 == 0:
             print(
                 f'time: {i:5}, climb: {climb:10.4f}, yaw: {yaw:10.4f}, '
                 f'pitch: {pitch:10.4f}, roll: {roll:10.4f}'
