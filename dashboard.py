@@ -1,6 +1,5 @@
 ''' module dashboard for DJI Mavic Pro
 '''
-import re
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -9,7 +8,7 @@ from matplotlib import lines as mpl_lines
 from rc_io import read_flightdata_csv
 
 rc_filename = 'Oct-27th-2020-12-05PM-Flight-Airdata.csv'
-fig_size = (10, 5)
+fig_size = (13, 6)
 stick_end_color = 'red'
 stick_end_size = 5
 stick_color = 'blue'
@@ -21,10 +20,6 @@ initial_r = 0
 rc_max = 1684
 rc_min = 364
 rc_zero = 1024
-
-def conv_polar_to_xy(theta, r):
-    return r*np.cos(theta), r*np.sin(theta)
-
 
 def conv_xy_to_polar(x, y):
     return np.degrees(np.arctan2(y, x)), np.sqrt(x*x + y*y)
@@ -38,11 +33,13 @@ class RemoteControlDisplay:
         self.rc_fig.suptitle(None)
         connect = self.rc_fig.canvas.mpl_connect
         connect('key_press_event', self.on_key)
+        self._pause = False
 
     def on_key(self, event):
         if event.key == ' ':
-            # TODO add pause function on pressing space
-            print('Hallo ....')
+            self._pause = not self._pause
+            if self._pause:
+                print('pause ...')
 
     def blit(self):
         self.fig.canvas.draw()
@@ -55,6 +52,10 @@ class RemoteControlDisplay:
     @property
     def rmax(self):
         return  self._rmax
+
+    @property
+    def pause(self):
+        return self._pause
 
 
 class RcStick():
@@ -98,7 +99,7 @@ class RcStick():
         # axis ticks
         ticks = np.arange(0, self.cf*rmax, tick_intval)
         ticks = sorted(np.append(-ticks[1:], ticks))
-        if left:
+        if left or True:
             self.ax_carth.set_yticks(ticks)
 
         else:
@@ -146,14 +147,6 @@ class RcStick():
         # from (bv, 0) to (bv, y)
         self.bar_y.set_data([-self.bv, -self.bv], [0, y])
 
-
-    def input_vals(self):
-        answer = input('Give theta (degrees), radius: ')
-        theta, r = (float(a) for a in re.split(r'\s|, ', answer))
-        x, y = conv_polar_to_xy(np.radians(theta), r)
-        self.stick_val(x, y)
-        self.bar_val(x, y)
-
     def rc_vals(self, val1, val2):
         self.stick_val(val1, val2)
         self.bar_val(val1, val2)
@@ -184,6 +177,9 @@ if __name__ == '__main__':
     input('start')
     for i, (climb, yaw, pitch, roll)  in enumerate(
             zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
+
+        while rc.pause:
+            rc.blit()
 
         # blot diplay for every second of the flight (10 x 100 ms)
         # nominal there may be gaps if reception is poor
