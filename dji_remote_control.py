@@ -1,4 +1,4 @@
-''' module dashboard for DJI Mavic Pro
+''' module remote control for DJI Mavic Pro
 '''
 import numpy as np
 import matplotlib as mpl
@@ -15,8 +15,6 @@ stick_color = 'blue'
 stick_width = 5
 bar_color = 'orange'
 bar_width = 10
-initial_theta = 0
-initial_r = 0
 rc_max = 1684
 rc_min = 364
 rc_zero = 1024
@@ -86,55 +84,51 @@ class RcStick():
             ]
 
         # place carthesian grid in fig
-        self.ax_carth = fig.add_axes(rect_carth)
+        ax_carth = fig.add_axes(rect_carth)
 
         # adjust x, y limits to match the one on the polar plot
-        self.cf = (1-2*rect_carth_offs) / (1-2*rect_carth_offs-2*rect_polar_offs)
-        self.ax_carth.set(
-            xlim=(-self.cf*rmax, self.cf*rmax),
-            ylim=(-self.cf*rmax, self.cf*rmax),
-            aspect='equal'
-        )
-        self.bv = rmax * self.cf
+        self.bv = rmax * (1-2*rect_carth_offs) / (1-2*rect_carth_offs-2*rect_polar_offs)
+        ax_carth.set(xlim=(-self.bv, self.bv), ylim=(-self.bv, self.bv), aspect='equal')
+
         # axis ticks
-        ticks = np.arange(0, self.cf*rmax, tick_intval)
+        ticks = np.arange(0, self.bv, tick_intval)
         ticks = sorted(np.append(-ticks[1:], ticks))
         if left or True:
-            self.ax_carth.set_yticks(ticks)
+            ax_carth.set_yticks(ticks)
 
         else:
-            self.ax_carth.set_yticks([])
-        self.ax_carth.set_xticks(ticks)
+            ax_carth.set_yticks([])
+        ax_carth.set_xticks(ticks)
 
         # place polar grid in carthesian grid
-        self.ax_polar = fig.add_axes(rect_polar, polar=True, frameon=False)
-        self.ax_polar.set_rmax(rmax)
+        ax_polar = fig.add_axes(rect_polar, polar=True, frameon=False)
+        ax_polar.set_rmax(rmax)
 
         # display of stick
         self.stick_end = mpl_patches.Circle(
             (0, 0), radius=stick_end_size, fc=stick_end_color,
-            transform=self.ax_polar.transData._b
+            transform=ax_polar.transData._b
         )
         self.stick = mpl_lines.Line2D(
             [0, 0], [0, 0], linewidth=stick_width, color=stick_color
         )
-        self.ax_polar.add_patch(self.stick_end)
-        self.ax_polar.add_line(self.stick)
-        self.stick_val(initial_theta, initial_r)
+        ax_polar.add_patch(self.stick_end)
+        ax_polar.add_line(self.stick)
+        self.stick_val(0, 0)
 
         # display of x, y bars
         self.bar_x = mpl_lines.Line2D(
-            [0, 0], [0, 0], linewidth=bar_width, color=bar_color
+            [0, 0], [0, 0], linewidth=bar_width, color=bar_color, solid_capstyle='butt',
         )
         self.bar_y = mpl_lines.Line2D(
-            [0, 0], [0, 0], linewidth=bar_width, color=bar_color
+            [0, 0], [0, 0], linewidth=bar_width, color=bar_color, solid_capstyle='butt',
         )
-        self.ax_carth.add_line(self.bar_x)
-        self.ax_carth.add_line(self.bar_y)
-        self.bar_val(initial_theta, initial_r)
+        ax_carth.add_line(self.bar_x)
+        ax_carth.add_line(self.bar_y)
+        self.bar_val(0, 0)
 
-        self.ax_carth.set_title(stick_name)
-        self.ax_polar.set_yticklabels([])
+        ax_carth.set_title(stick_name)
+        ax_polar.set_yticklabels([])
 
     def stick_val(self, x, y):
         theta, r = conv_xy_to_polar(x, y)
