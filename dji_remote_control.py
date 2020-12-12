@@ -5,9 +5,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
-from rc_io import read_flightdata_csv
+from dji_mavic_io import read_flightdata_csv
 
-rc_filename = 'Oct-27th-2020-12-05PM-Flight-Airdata.csv'
+rc_filename = 'dji_mavic_test_data.csv'
 fig_size = (13, 6)
 stick_end_color = 'red'
 stick_end_size = 5
