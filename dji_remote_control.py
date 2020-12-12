@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
 
-fig_size = (13, 6)
+fig_size = (16.8/2.54, 8.4/2.54)
 stick_end_color = 'red'
 stick_end_size = 5
 stick_color = 'blue'
@@ -49,7 +49,7 @@ class RcStick(RemoteControlDisplay):
     def __init__(self, stick_name, left=True):
         rect_carth_offs = 0.050
         rect_polar_offs = 0.075
-        tick_intval = 20
+        tick_intval = 25
 
         if left:
             rect_carth = [
@@ -83,7 +83,7 @@ class RcStick(RemoteControlDisplay):
         # axis ticks
         ticks = np.arange(0, self.bv, tick_intval)
         ticks = sorted(np.append(-ticks[1:], ticks))
-        if left or True:
+        if left:
             ax_carth.set_yticks(ticks)
 
         else:
