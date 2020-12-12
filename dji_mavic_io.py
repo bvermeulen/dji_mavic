@@ -1,11 +1,11 @@
-''' module input/ output for remote control
+''' module input/ output for dji mavic pro
 '''
 import os
 import psutil
 import pandas as pd
 
 
-filename = 'Oct-27th-2020-12-05PM-Flight-Airdata.csv'
+filename = 'dji_mavic_test_data.csv'
 
 def read_flightdata_csv(file_name: str):
     ''' read Airdata UAV - csv flightdata
