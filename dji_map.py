@@ -1,8 +1,7 @@
-''' module for flight graphs dji mavic pro
+''' module for flightpath map for dji mavic pro
 '''
 import numpy as np
 import matplotlib.pyplot as plt
-# from shapely.geometry import Polygon
 from shapely.geometry import Point, LineString
 from geopandas import GeoDataFrame
 from dji_mavic_io import read_flightdata_csv
@@ -49,22 +48,25 @@ class MapDisplay:
         cls.fig.canvas.flush_events()
 
 
-class MapDrone(MapDisplay):
+class DroneFlight(MapDisplay):
 
     def __init__(self):
         self.drone_gdp = GeoDataFrame(geometry=self.homepoint_gdp.geometry)
         self.drone_gdp.crs = EPSG_WGS84
-        self.dl = self.drone_gdp.plot(
-            ax=self.ax_map, marker='o', color=drone_color, markersize=drone_size, gid='drone'
+        self.drone_gdp.plot(
+            ax=self.ax_map, marker='o', color=drone_color,
+            markersize=drone_size, gid='drone'
         )
 
     def update_location(self, point):
-        for plot_object in reversed(self.ax_map.collections):
-            if plot_object.get_gid() == 'drone':
-                plot_object.remove()
-
+        # below assumes ax_map 3rd collection item is the drone plot, this may not always
+        # be true. In that case use the commented code below
+        # for plot_object in self.ax_map.collections:
+        #     if plot_object.get_gid() == 'drone':
+        #         plot_object.remove()
+        self.ax_map.collections[2].remove()
         self.drone_gdp.set_geometry([point], inplace=True)
-        self.dl = self.drone_gdp.plot(
+        self.drone_gdp.plot(
             ax=self.ax_map, marker='o', color='blue', markersize=100, gid='drone'
         )
 
@@ -73,17 +75,18 @@ class MapDrone(MapDisplay):
             if i % 20 == 0:
                 self.update_location(point)
                 self.blit()
-                print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}')
+                print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
+                      f'map collections: {len(self.ax_map.collections)}')
 
 
 if __name__ == '__main__':
 
     flightdata_df = read_flightdata_csv(rc_filename)
-    longitude = np.array(flightdata_df['longitude'].to_list(), dtype=np.float64)
-    latitude = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
+    longitudes = np.array(flightdata_df['longitude'].to_list(), dtype=np.float64)
+    latitudes = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
     md = MapDisplay()
-    md.setup(longitude, latitude)
-    drone = MapDrone()
+    md.setup(longitudes, latitudes)
+    drone = DroneFlight()
 
     input('enter to start ...')
     drone.fly_drone()
