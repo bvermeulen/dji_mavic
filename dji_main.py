@@ -51,15 +51,21 @@ def dji_main():
     fl_height = np.array(
         flightdata_df['height_above_takeoff(feet)'].to_list(), dtype=np.float64
     )
-    graph_height = Graph(ax_height, 'height', 'feet', min(fl_height), max(fl_height))
+    graph_height = Graph(
+        ax_height, 'height', 'feet', min(fl_height), max(fl_height), fl_time, fl_height,
+    )
     fl_speed = np.array(
         flightdata_df['speed(mph)'].to_list(), dtype=np.float64
     ) * miles_km_conv
-    graph_speed = Graph(ax_speed, 'speed', 'kph', min(fl_speed), max(fl_speed))
+    graph_speed = Graph(
+        ax_speed, 'speed', 'kph', min(fl_speed), max(fl_speed), fl_time, fl_speed,
+    )
     fl_dist = np.array(
         flightdata_df['distance(feet)'].to_list(), dtype=np.float64
     ) * feet_meter_conv
-    graph_dist = Graph(ax_dist, 'distance', 'meter', min(fl_dist), max(fl_dist))
+    graph_dist = Graph(
+        ax_dist, 'distance', 'meter', min(fl_dist), max(fl_dist), fl_time, fl_dist,
+    )
 
     input('start')
     for i, (climb, yaw, pitch, roll)  in enumerate(

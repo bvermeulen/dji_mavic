@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 
 
 fig_size = (6, 3)
-graph_color = 'black'
+graph_light_color = 'lightgrey'
+graph_dark_color = 'black'
 graph_lw = 0.5
 graph_xlabel = 'time (s)'
 
@@ -46,13 +47,16 @@ class GraphDisplay:
 
 class Graph(GraphDisplay):
 
-    def __init__(self, ax, title, ylabel, min_y, max_y):
+    def __init__(self, ax, title, ylabel, min_y, max_y, x, y):
+        self.graph_bg, = ax.plot(
+            x, y, color=graph_light_color, linewidth=graph_lw,
+        )
         self.graph, = ax.plot(
-            [0], [0], color=graph_color, linewidth=graph_lw,
+            [0], [0], color=graph_dark_color, linewidth=graph_lw,
         )
         ax.set_ylim(min_y*1.1, max_y*1.1)
         ax.set_title(title)
         ax.set_ylabel(ylabel)
 
     def update(self, x_values, y_values):
-        self.graph.set_data(x_values, y_values)
+        self.graph.set_data(x_values, y_values,)

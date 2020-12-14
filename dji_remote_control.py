@@ -7,13 +7,18 @@ from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
 
 fig_size = (16.8/2.54, 8.4/2.54)
+rect_carth_offs = 0.09
+rect_polar_offs = 0.120
+tick_intval = 50
+
 stick_end_color = 'red'
-stick_end_size = 5
+stick_end_size = 6
 stick_color = 'blue'
-stick_width = 5
+stick_width = 3
 bar_color = 'orange'
-bar_width = 10
+bar_width = 5
 plt.ion()
+
 
 def conv_xy_to_polar(x, y):
     return np.degrees(np.arctan2(y, x)), np.sqrt(x*x + y*y)
@@ -47,9 +52,6 @@ class RemoteControlDisplay:
 class RcStick(RemoteControlDisplay):
 
     def __init__(self, stick_name, left=True):
-        rect_carth_offs = 0.050
-        rect_polar_offs = 0.075
-        tick_intval = 25
 
         if left:
             rect_carth = [
@@ -97,7 +99,7 @@ class RcStick(RemoteControlDisplay):
         # display of stick
         self.stick_end = mpl_patches.Circle(
             (0, 0), radius=stick_end_size, fc=stick_end_color,
-            transform=ax_polar.transData._b
+            transform=ax_polar.transData._b, zorder=10
         )
         self.stick = mpl_lines.Line2D(
             [0, 0], [0, 0], linewidth=stick_width, color=stick_color
