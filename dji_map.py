@@ -65,7 +65,7 @@ class MapDisplay:
         # cls.fig.canvas.restore_region(cls.background)
         # cls.fig.canvas.draw()
         cls.fig.canvas.blit(cls.fig.bbox)
-        # cls.fig.canvas.flush_events()
+        cls.fig.canvas.flush_events()
 
 
 class DroneFlight(MapDisplay):
@@ -98,6 +98,7 @@ class DroneFlight(MapDisplay):
                 self.update_location(point)
                 print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
                       f'map collections: {len(self.ax_map.collections)}')
+                self.blit()
 
 
 if __name__ == '__main__':
@@ -111,5 +112,4 @@ if __name__ == '__main__':
 
     input('enter to start ...')
     drone.fly_drone()
-    drone.blit()
     input('enter to finish ...')
