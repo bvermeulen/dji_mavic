@@ -1,7 +1,7 @@
 ''' module for flightpath map for dji mavic pro
 '''
 import numpy as np
-import matplotlib as mpl
+from matplotlib import patches as mpl_patches
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, LineString
 import pyproj
@@ -17,7 +17,7 @@ flightpath_color = 'grey'
 homepoint_color = 'red'
 homepoint_size = 500
 drone_color = 'blue'
-drone_size = 100
+drone_size = 15
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
 plt.ion()
 
@@ -65,37 +65,25 @@ class MapDisplay:
         # cls.fig.canvas.restore_region(cls.background)
         # cls.fig.canvas.draw()
         cls.fig.canvas.blit(cls.fig.bbox)
-        # cls.fig.canvas.flush_events()
+        cls.fig.canvas.flush_events()
 
 
 class DroneFlight(MapDisplay):
 
     def __init__(self):
-
-        self.drone_gpd = GeoDataFrame(geometry=[self.flightpoints[0]])
-        self.drone_gpd.crs = EPSG_OSM
-
-        self.drone_gpd.plot(
-            ax=self.ax_map, marker='o', color=drone_color,
-            markersize=drone_size, gid='drone'
-        )
+        self.drone = mpl_patches.Circle(
+            (self.flightpoints[0].x, self.flightpoints[0].y),
+            fc=drone_color, radius=drone_size)
+        self.ax_map.add_patch(self.drone)
 
     def update_location(self, point):
-        # below assumes ax_map 3rd collection item is the drone plot, this may not always
-        # be true. In that case use the commented code below
-        # for plot_object in self.ax_map.collections:
-        #     if plot_object.get_gid() == 'drone':
-        #         plot_object.remove()
-        self.ax_map.collections[2].remove()
-        self.drone_gpd.set_geometry([point], inplace=True)
-        self.drone_gpd.plot(
-            ax=self.ax_map, marker='o', color='blue', markersize=100, gid='drone'
-        )
+        self.drone.center = (point.x, point.y)
 
     def fly_drone(self):
         for i, point in enumerate(self.flightpoints):
             if i % 20 == 0:
                 self.update_location(point)
+                self.blit()
                 print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
                       f'map collections: {len(self.ax_map.collections)}')
 
@@ -111,5 +99,4 @@ if __name__ == '__main__':
 
     input('enter to start ...')
     drone.fly_drone()
-    drone.blit()
     input('enter to finish ...')
