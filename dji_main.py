@@ -71,11 +71,32 @@ def dji_main():
     latitudes = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
     md = MapDisplay()
     md.setup(longitudes, latitudes)
-    drone = DroneFlight()
+    dd = DroneFlight()
+
+    def remote_control_display(index):
+        rc_left.rc_vals(rc_yaw[i], rc_climb[i])
+        rc_right.rc_vals(rc_roll[i], rc_pitch[i])
+        rcd.blit()
+
+    def graph_display(index):
+        graph_height.update(fl_time[:index], fl_height[:index])
+        graph_speed.update(fl_time[:index], fl_speed[:index])
+        graph_dist.update(fl_time[:index], fl_dist[:index])
+        gd.blit()
+
+    def drone_display(index):
+        dd.update_location(dd.flightpoints[index])
+        dd.blit()
+
+    def printval(index):
+        print(
+            f'time: {fl_time[index]:6}, climb: {rc_climb[index]:10.4f}, '
+            f'yaw: {rc_yaw[index]:10.4f}, pitch: {rc_pitch[index]:10.4f}, '
+            f'roll: {rc_roll[index]:10.4f}'
+        )
 
     input('start')
-    for i, (climb, yaw, pitch, roll)  in enumerate(
-            zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
+    for i in range(len(rc_climb)):
 
         while rcd.pause:
             rcd.blit()
@@ -83,23 +104,10 @@ def dji_main():
         # blot diplay for every second of the flight (10 x 100 ms)
         # nominal there may be gaps if reception is poor
         if i % blit_rate == 0:
-            rc_left.rc_vals(yaw, climb)
-            rc_right.rc_vals(roll, pitch)
-            rcd.blit()
-
-            graph_height.update(fl_time[:i], fl_height[:i])
-            graph_speed.update(fl_time[:i], fl_speed[:i])
-            graph_dist.update(fl_time[:i], fl_dist[:i])
-            gd.blit()
-
-            drone.update_location(drone.flightpoints[i])
-            drone.blit()
-
-        if i % blit_rate == 0:
-            print(
-                f'time: {i:5}, climb: {climb:10.4f}, yaw: {yaw:10.4f}, '
-                f'pitch: {pitch:10.4f}, roll: {roll:10.4f}'
-            )
+            remote_control_display(i)
+            graph_display(i)
+            drone_display(i)
+            printval(i)
 
     input('finish')
 

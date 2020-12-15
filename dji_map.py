@@ -73,7 +73,8 @@ class DroneFlight(MapDisplay):
     def __init__(self):
         self.drone = mpl_patches.Circle(
             (self.flightpoints[0].x, self.flightpoints[0].y),
-            fc=drone_color, radius=drone_size)
+            fc=drone_color, radius=drone_size
+        )
         self.ax_map.add_patch(self.drone)
 
     def update_location(self, point):
