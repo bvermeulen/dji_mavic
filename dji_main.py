@@ -3,10 +3,11 @@
 import numpy as np
 from dji_remote_control import RemoteControlDisplay, RcStick
 from dji_flight_graphs import GraphDisplay, Graph
+from dji_map import MapDisplay, DroneFlight
 from dji_mavic_io import read_flightdata_csv
 
 
-rc_filename = 'dji_mavic_test_data.csv'
+rc_filename = 'dji_mavic_test_data_2.csv'
 rc_max = 1684
 rc_min = 364
 rc_zero = 1024
@@ -38,7 +39,6 @@ def dji_main():
     rc_left = RcStick('climb/ yaw', left=True)
     rc_right = RcStick('pitch/ roll', left=False)
 
-
     fl_time = np.array(
         flightdata_df['time(millisecond)'].to_list(), dtype=np.float64
     ) / 1000
@@ -67,6 +67,12 @@ def dji_main():
         ax_dist, 'distance', 'meter', min(fl_dist), max(fl_dist), fl_time, fl_dist,
     )
 
+    longitudes = np.array(flightdata_df['longitude'].to_list(), dtype=np.float64)
+    latitudes = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
+    md = MapDisplay()
+    md.setup(longitudes, latitudes)
+    drone = DroneFlight()
+
     input('start')
     for i, (climb, yaw, pitch, roll)  in enumerate(
             zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
@@ -84,7 +90,10 @@ def dji_main():
             graph_height.update(fl_time[:i], fl_height[:i])
             graph_speed.update(fl_time[:i], fl_speed[:i])
             graph_dist.update(fl_time[:i], fl_dist[:i])
-            # gd.blit()
+            gd.blit()
+
+            drone.update_location(drone.flightpoints[i])
+            drone.blit()
 
         if i % blit_rate == 0:
             print(

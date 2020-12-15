@@ -17,7 +17,7 @@ stick_color = 'blue'
 stick_width = 3
 bar_color = 'orange'
 bar_width = 5
-plt.ion()
+# plt.ion()
 
 
 def conv_xy_to_polar(x, y):
@@ -45,7 +45,7 @@ class RemoteControlDisplay:
 
     @classmethod
     def blit(cls):
-        cls.fig.canvas.draw()
+        cls.fig.canvas.blit(cls.fig.bbox)
         cls.fig.canvas.flush_events()
 
 
