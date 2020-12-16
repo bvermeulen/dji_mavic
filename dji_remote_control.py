@@ -17,7 +17,6 @@ stick_color = 'blue'
 stick_width = 3
 bar_color = 'orange'
 bar_width = 5
-# plt.ion()
 
 
 def conv_xy_to_polar(x, y):
@@ -32,20 +31,10 @@ class RemoteControlDisplay:
         mpl.rcParams['toolbar'] = 'None'
         cls.fig = plt.figure('Remote Control', figsize=fig_size)
         cls.fig.suptitle(None)
-        connect = cls.fig.canvas.mpl_connect
-        connect('key_press_event', cls.on_key)
-        cls.pause = False
-
-    @classmethod
-    def on_key(cls, event):
-        if event.key == ' ':
-            cls.pause = not cls.pause
-            if cls.pause:
-                print('pause ...')
 
     @classmethod
     def blit(cls):
-        cls.fig.canvas.blit(cls.fig.bbox)
+        cls.fig.canvas.blit()
         cls.fig.canvas.flush_events()
 
 

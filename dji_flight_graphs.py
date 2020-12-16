@@ -41,7 +41,7 @@ class GraphDisplay:
 
     @classmethod
     def blit(cls):
-        cls.graphs_fig.canvas.blit(cls.graphs_fig.bbox)
+        cls.graphs_fig.canvas.blit()
         # cls.graphs_fig.canvas.flush_events()
 
 

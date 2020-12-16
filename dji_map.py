@@ -9,6 +9,8 @@ from geopandas import GeoDataFrame
 import contextily as ctx
 from dji_mavic_io import read_flightdata_csv
 
+#pylint: disable=no-value-for-parameter
+
 rc_filename = 'dji_mavic_test_data_2.csv'
 fig_size = (6, 6)
 EPSG_WGS84 = 4326
@@ -21,7 +23,6 @@ drone_size = 15
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
 plt.ion()
 
-
 class MapDisplay:
 
     @classmethod
@@ -30,7 +31,6 @@ class MapDisplay:
         cls.fig, cls.ax_map = plt.subplots(figsize=fig_size)
         cls.fig.canvas.set_window_title('Drone flightpath')
         cls.fig.suptitle(None)
-        # cls.background = cls.fig.canvas.copy_from_bbox(cls.fig.bbox)
 
         # create flightpoints and flightpath in osm projection
         cls.flightpoints = [
@@ -55,6 +55,11 @@ class MapDisplay:
             ax=cls.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
         cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
+        cls.background = cls.fig.canvas.copy_from_bbox(cls.fig.bbox)
+
+        connect = cls.fig.canvas.mpl_connect
+        connect('key_press_event', cls.on_key)
+        cls.pause = False
 
     @classmethod
     def add_basemap_osm(cls, source=ctx.providers.OpenStreetMap.Mapnik):
@@ -63,10 +68,15 @@ class MapDisplay:
     @classmethod
     def blit(cls):
         # cls.fig.canvas.restore_region(cls.background)
-        # cls.fig.canvas.draw()
-        cls.fig.canvas.blit(cls.fig.bbox)
+        cls.fig.canvas.blit()
         cls.fig.canvas.flush_events()
 
+    @classmethod
+    def on_key(cls, event):
+        if event.key == ' ':
+            cls.pause = not cls.pause
+            if cls.pause:
+                print('pause ...')
 
 class DroneFlight(MapDisplay):
 
@@ -76,17 +86,19 @@ class DroneFlight(MapDisplay):
             fc=drone_color, radius=drone_size
         )
         self.ax_map.add_patch(self.drone)
+        self.fig.canvas.draw()
 
     def update_location(self, point):
         self.drone.center = (point.x, point.y)
 
     def fly_drone(self):
         for i, point in enumerate(self.flightpoints):
-            if i % 20 == 0:
+            if i % 25 == 0:
                 self.update_location(point)
                 self.blit()
                 print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
                       f'map collections: {len(self.ax_map.collections)}')
+
 
 
 if __name__ == '__main__':
