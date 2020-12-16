@@ -8,6 +8,7 @@ import pyproj
 from geopandas import GeoDataFrame
 import contextily as ctx
 from dji_mavic_io import read_flightdata_csv
+from utils.plogger import Logger, timed
 
 #pylint: disable=no-value-for-parameter
 
@@ -21,7 +22,11 @@ homepoint_size = 500
 drone_color = 'blue'
 drone_size = 15
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
-plt.ion()
+
+# Logging setup
+Logger.set_logger('dji_map.log', '%(asctime)s:%(levelname)s:%(message)s', 'INFO')
+logger = Logger.getlogger()
+
 
 class MapDisplay:
 
@@ -67,8 +72,8 @@ class MapDisplay:
 
     @classmethod
     def blit(cls):
-        # cls.fig.canvas.restore_region(cls.background)
-        cls.fig.canvas.blit()
+        cls.fig.canvas.restore_region(cls.background)
+        cls.fig.canvas.blit(cls.fig.bbox)
         cls.fig.canvas.flush_events()
 
     @classmethod
@@ -95,11 +100,16 @@ class DroneFlight(MapDisplay):
         for i, point in enumerate(self.flightpoints):
             if i % 25 == 0:
                 self.update_location(point)
-                self.blit()
+                self.blit_drone()
                 print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
                       f'map collections: {len(self.ax_map.collections)}')
 
-
+    @timed(logger)
+    def blit_drone(self):
+        self.fig.canvas.restore_region(self.background)
+        self.fig.draw_artist(self.drone)
+        self.fig.canvas.blit(self.fig.bbox)
+        self.fig.canvas.flush_events()
 
 if __name__ == '__main__':
 
@@ -109,7 +119,8 @@ if __name__ == '__main__':
     md = MapDisplay()
     md.setup(longitudes, latitudes)
     drone = DroneFlight()
-
+    plt.show(block=False)
+    plt.pause(.1)
     input('enter to start ...')
     drone.fly_drone()
     input('enter to finish ...')

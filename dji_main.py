@@ -1,6 +1,7 @@
 ''' dji main module
 '''
 import numpy as np
+import mapplotlib.pyplot as plt
 from dji_remote_control import RemoteControlDisplay, RcStick
 from dji_flight_graphs import GraphDisplay, Graph
 from dji_map import MapDisplay, DroneFlight
@@ -111,6 +112,7 @@ def dji_main():
         )
 
     input('start')
+    plt.show(block=False)
     for i in range(len(rc_climb)):
 
         while dd.pause:
