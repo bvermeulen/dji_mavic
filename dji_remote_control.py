@@ -3,8 +3,15 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import animation
 from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
+from dji_mavic_io import read_flightdata_csv
+
+rc_filename = 'dji_mavic_test_data_2.csv'
+rc_max = 1684
+rc_min = 364
+rc_zero = 1024
 
 fig_size = (16.8/2.54, 8.4/2.54)
 rect_carth_offs = 0.09
@@ -63,38 +70,40 @@ class RcStick(RemoteControlDisplay):
             ]
 
         # place carthesian grid in fig
-        ax_carth = self.fig.add_axes(rect_carth)
+        self.ax_carth = self.fig.add_axes(rect_carth)
 
         # adjust x, y limits to match the one on the polar plot
         self.bv = (
             self.rmax * (1-2*rect_carth_offs) / (1-2*rect_carth_offs-2*rect_polar_offs)
         )
-        ax_carth.set(xlim=(-self.bv, self.bv), ylim=(-self.bv, self.bv), aspect='equal')
+        self.ax_carth.set(
+            xlim=(-self.bv, self.bv), ylim=(-self.bv, self.bv), aspect='equal'
+        )
 
         # axis ticks
         ticks = np.arange(0, self.bv, tick_intval)
         ticks = sorted(np.append(-ticks[1:], ticks))
         if left:
-            ax_carth.set_yticks(ticks)
+            self.ax_carth.set_yticks(ticks)
 
         else:
-            ax_carth.set_yticks([])
-        ax_carth.set_xticks(ticks)
+            self.ax_carth.set_yticks([])
+        self.ax_carth.set_xticks(ticks)
 
         # place polar grid in carthesian grid
-        ax_polar = self.fig.add_axes(rect_polar, polar=True, frameon=False)
-        ax_polar.set_rmax(self.rmax)
+        self.ax_polar = self.fig.add_axes(rect_polar, polar=True, frameon=False)
+        self.ax_polar.set_rmax(self.rmax)
 
         # display of stick
         self.stick_end = mpl_patches.Circle(
             (0, 0), radius=stick_end_size, fc=stick_end_color,
-            transform=ax_polar.transData._b, zorder=10
+            transform=self.ax_polar.transData._b, zorder=10
         )
         self.stick = mpl_lines.Line2D(
             [0, 0], [0, 0], linewidth=stick_width, color=stick_color
         )
-        ax_polar.add_patch(self.stick_end)
-        ax_polar.add_line(self.stick)
+        self.ax_polar.add_patch(self.stick_end)
+        self.ax_polar.add_line(self.stick)
         self.stick_val(0, 0)
 
         # display of x, y bars
@@ -104,12 +113,12 @@ class RcStick(RemoteControlDisplay):
         self.bar_y = mpl_lines.Line2D(
             [0, 0], [0, 0], linewidth=bar_width, color=bar_color, solid_capstyle='butt',
         )
-        ax_carth.add_line(self.bar_x)
-        ax_carth.add_line(self.bar_y)
+        self.ax_carth.add_line(self.bar_x)
+        self.ax_carth.add_line(self.bar_y)
         self.bar_val(0, 0)
 
-        ax_carth.set_title(stick_name)
-        ax_polar.set_yticklabels([])
+        self.ax_carth.set_title(stick_name)
+        self.ax_polar.set_yticklabels([])
 
     def stick_val(self, x, y):
         theta, r = conv_xy_to_polar(x, y)
@@ -129,6 +138,8 @@ class RcStick(RemoteControlDisplay):
     def blit_rc(self):
         self.fig.draw_artist(self.stick)
         self.fig.draw_artist(self.stick_end)
+        self.fig.draw_artist(self.bar_x)
+        self.fig.draw_artist(self.bar_y)
         self.fig.canvas.blit()
         self.fig.canvas.flush_events()
 
@@ -138,24 +149,48 @@ class RcStick(RemoteControlDisplay):
 
 
 if __name__ == '__main__':
+    flightdata_df = read_flightdata_csv(rc_filename)
+    rc_climb = np.array(flightdata_df['rc_throttle'].to_list(), dtype=np.float64)
+    rc_yaw = np.array(flightdata_df['rc_rudder'].to_list(), dtype=np.float64)
+    # normalize axises * 100
+    rc_climb -= rc_zero
+    rc_climb /= 0.01 * (rc_max - rc_zero)
+    rc_yaw -= rc_zero
+    rc_yaw /= 0.01 * (rc_max - rc_zero)
+
+    rc_pitch = np.array(flightdata_df['rc_elevator'].to_list(), dtype=np.float64)
+    rc_roll = np.array(flightdata_df['rc_aileron'].to_list(), dtype=np.float64)
+    # normalize axises * 100
+    rc_pitch -= rc_zero
+    rc_pitch /= 0.01 * (rc_max - rc_zero)
+    rc_roll -= rc_zero
+    rc_roll /= 0.01 * (rc_max - rc_zero)
+
+
     rcd = RemoteControlDisplay()
     rcd.setup(120)
-    rc_left = RcStick('val 1/ val 2', left=True)
-    rc_right = RcStick('val 3/ val 4', left=False)
-    rc_left.draw_rc()
-    rc_right.draw_rc()
-    plt.show(block=False)
-
-    input('enter to continue')
-    rc_left.rc_vals(30, 70)
-    rc_right.rc_vals(-60, 20)
+    rc_right = RcStick('pitch/ roll', left=False)
+    rc_left = RcStick('climb/ yaw', left=True)
     rcd.blit()
+    input('continue ...')
 
-    input('enter to continue')
-    rc_left.rc_vals(120, 40)
-    rc_right.rc_vals(-60, 120)
-    rc_left.blit_rc()
-    rc_right.blit_rc()
+    def init():
+        return (
+            rc_left.stick, rc_left.stick_end, rc_right.stick, rc_right.stick_end,
+            rc_left.bar_x, rc_left.bar_y, rc_right.bar_x, rc_right.bar_y,
+        )
 
-    input('enter to stop')
+    def rc_animate(i):
+        print(f'frame: {i}')
+        rc_left.rc_vals(rc_roll[i], rc_pitch[i])
+        rc_right.rc_vals(rc_yaw[i], rc_climb[i])
+        return (
+            rc_left.stick, rc_left.stick_end, rc_right.stick, rc_right.stick_end,
+            rc_left.bar_x, rc_left.bar_y, rc_right.bar_x, rc_right.bar_y,
+        )
 
+    anim = animation.FuncAnimation(
+        rcd.fig, rc_animate, init_func=init, interval=1,
+        frames=len(rc_pitch), repeat=False, blit=True
+    )
+    plt.show()

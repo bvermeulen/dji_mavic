@@ -2,6 +2,7 @@
 '''
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import animation
 from matplotlib import patches as mpl_patches
 from shapely.geometry import Point, LineString
 import pyproj
@@ -59,7 +60,7 @@ class MapDisplay:
         homepoint_gpd.plot(
             ax=cls.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
-        # cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
+        cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
         cls.background = cls.fig.canvas.copy_from_bbox(cls.fig.bbox)
 
 
@@ -83,24 +84,14 @@ class DroneFlight(MapDisplay):
             fc=drone_color, radius=drone_size,
         )
         self.ax_map.add_patch(self.drone)
-        self.fig.canvas.draw()
+        # self.fig.canvas.draw()
 
         connect = self.fig.canvas.mpl_connect
         connect('key_press_event', self.on_key)
-        self.pause = False
-
-        plt.show()
+        self.pause = True
 
     def update_location(self, point):
         self.drone.center = (point.x, point.y)
-
-    def fly_drone(self):
-        for i, point in enumerate(self.flightpoints):
-            if i % 25 == 0:
-                self.update_location(point)
-                self.blit()
-                print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
-                      f'map collections: {len(self.ax_map.collections)}')
 
     @timed(logger)
     def blit_drone(self):
@@ -127,7 +118,21 @@ if __name__ == '__main__':
     md = MapDisplay()
     md.setup(longitudes, latitudes)
     drone = DroneFlight()
+    input('continue ...')
 
-    input('enter to start ...')
-    drone.fly_drone()
-    input('enter to finish ...')
+    flightpoints = drone.flightpoints[::1]
+    def init():
+        return drone.drone,
+
+    def animate(i):
+        while drone.pause:
+            drone.blit()
+        print(f'frame: {i}')
+        drone.update_location(flightpoints[i])
+        return drone.drone,
+
+    anim = animation.FuncAnimation(
+        drone.fig, animate, init_func=init, interval=1,
+        frames=len(flightpoints), repeat=False, blit=True
+    )
+    plt.show()

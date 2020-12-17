@@ -19,11 +19,11 @@ class GraphDisplay:
     @classmethod
     def setup(cls, duration):
         mpl.rcParams['toolbar'] = 'None'
-        cls.graphs_fig, (cls.ax_graph_1, cls.ax_graph_2, cls.ax_graph_3) = plt.subplots(
+        cls.fig, (cls.ax_graph_1, cls.ax_graph_2, cls.ax_graph_3) = plt.subplots(
             nrows=3, ncols=1, figsize=fig_size, sharex='all')
-        cls.graphs_fig.canvas.set_window_title('Flight graphs')
-        cls.graphs_fig.suptitle(None)
-        cls.graphs_fig.tight_layout()
+        cls.fig.canvas.set_window_title('Flight graphs')
+        cls.fig.suptitle(None)
+        cls.fig.tight_layout()
         cls.ax_graph_3.set_xlabel(graph_xlabel)
         cls.ax_graph_3.set_xlim(0, duration)
 
@@ -41,8 +41,8 @@ class GraphDisplay:
 
     @classmethod
     def blit(cls):
-        cls.graphs_fig.canvas.blit()
-        # cls.graphs_fig.canvas.flush_events()
+        cls.fig.canvas.blit()
+        cls.fig.canvas.flush_events()
 
 
 class Graph(GraphDisplay):

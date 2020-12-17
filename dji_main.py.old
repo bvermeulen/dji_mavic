@@ -2,7 +2,6 @@
 '''
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import animation
 from dji_remote_control import RemoteControlDisplay, RcStick
 from dji_flight_graphs import GraphDisplay, Graph
 from dji_map import MapDisplay, DroneFlight
@@ -10,7 +9,6 @@ from dji_mavic_io import read_flightdata_csv
 from utils.plogger import Logger, timed
 
 #pylint: disable=no-value-for-parameter
-
 # for faster plotting check:
 # https://stackoverflow.com/questions/40126176/fast-live-plotting-in-matplotlib-pyplot
 
@@ -20,7 +18,9 @@ rc_min = 364
 rc_zero = 1024
 miles_km_conv = 1.60934
 feet_meter_conv = 0.3048
-samplerate = 5
+blit_rate = 25
+show_rc = True
+show_print = False
 
 # Logging setup
 Logger.set_logger('dji_main.log', '%(asctime)s:%(levelname)s:%(message)s', 'INFO')
@@ -45,10 +45,11 @@ def dji_main():
     rc_roll -= rc_zero
     rc_roll /= 0.01 * (rc_max - rc_zero)
 
-    rcd = RemoteControlDisplay()
-    rcd.setup(120)
-    rc_left = RcStick('climb/ yaw', left=True)
-    rc_right = RcStick('pitch/ roll', left=False)
+    if show_rc:
+        rcd = RemoteControlDisplay()
+        rcd.setup(120)
+        rc_left = RcStick('climb/ yaw', left=True)
+        rc_right = RcStick('pitch/ roll', left=False)
 
     fl_time = np.array(
         flightdata_df['time(millisecond)'].to_list(), dtype=np.float64
@@ -84,61 +85,53 @@ def dji_main():
     md.setup(longitudes, latitudes)
     dd = DroneFlight()
 
-    rc_roll = rc_roll[::samplerate]
-    rc_pitch = rc_pitch[::samplerate]
-    rc_yaw = rc_yaw[::samplerate]
-    rc_climb = rc_climb[::samplerate]
-    def rc_init():
-        return (
-            rc_left.stick, rc_left.stick_end, rc_right.stick, rc_right.stick_end,
-            rc_left.bar_x, rc_left.bar_y, rc_right.bar_x, rc_right.bar_y,
-        )
-
-    def rc_animate(i):
-        print(f'frame rc: {i}')
+    @timed(logger)
+    def remote_control_display(index):
         rc_left.rc_vals(rc_yaw[i], rc_climb[i])
         rc_right.rc_vals(rc_roll[i], rc_pitch[i])
-        return (
-            rc_left.stick, rc_left.stick_end, rc_right.stick, rc_right.stick_end,
-            rc_left.bar_x, rc_left.bar_y, rc_right.bar_x, rc_right.bar_y,
+        rc_left.blit_rc()
+        rc_right.blit_rc()
+
+    @timed(logger)
+    def graph_display(index):
+        graph_height.update(fl_time[:index], fl_height[:index])
+        graph_speed.update(fl_time[:index], fl_speed[:index])
+        graph_dist.update(fl_time[:index], fl_dist[:index])
+        gd.blit()
+
+    @timed(logger)
+    def drone_display(index):
+        dd.update_location(dd.flightpoints[index])
+        dd.blit_drone()
+
+    @timed(logger)
+    def printval(index):
+        print(
+            f'time: {fl_time[index]:6}, '
+            f'climb: {rc_climb[index]:10.4f}, yaw: {rc_yaw[index]:10.4f}, '
+            f'pitch: {rc_pitch[index]:10.4f}, roll: {rc_roll[index]:10.4f}'
         )
 
-    flightpoints = dd.flightpoints[::samplerate]
-    def dd_init():
-        return dd.drone,
+    plt.show(block=False)
+    plt.pause(.1)
+    input('start')
 
-    def dd_animate(i):
-        print(f'frame dd: {i}')
-        dd.update_location(flightpoints[i])
-        return dd.drone,
+    for i in range(len(rc_climb)):
 
-    fl_time = fl_time[::samplerate]
-    fl_height = fl_height[::samplerate]
-    fl_speed = fl_speed[::samplerate]
-    fl_dist = fl_dist[::samplerate]
-    def gd_init():
-        return graph_height.graph, graph_speed.graph, graph_dist.graph
+        while dd.pause:
+            dd.blit()
 
-    def gd_animate(i):
-        print(f'frame gd: {i}')
-        graph_height.update(fl_time[:i], fl_height[:i])
-        graph_speed.update(fl_time[:i], fl_speed[:i])
-        graph_dist.update(fl_time[:i], fl_dist[:i])
-        return graph_height.graph, graph_speed.graph, graph_dist.graph
+        # blot diplay for every second of the flight (10 x 100 ms)
+        # nominal there may be gaps if reception is poor
+        if i % blit_rate == 0:
+            if show_rc:
+                remote_control_display(i)
+            # graph_display(i)
+            drone_display(i)
+            if show_print:
+                printval(i)
 
-    dd_anim = animation.FuncAnimation(
-        dd.fig, dd_animate, init_func=dd_init, interval=1,
-        frames=len(flightpoints), repeat=False, blit=True
-    )
-    rc_anim = animation.FuncAnimation(
-        dd.fig, rc_animate, init_func=rc_init, interval=1,
-        frames=len(rc_pitch), repeat=False, blit=True
-    )
-    gd_anim = animation.FuncAnimation(
-        gd.fig, gd_animate, init_func=gd_init, interval=1,
-        frames=len(fl_time), repeat=False, blit=True
-    )
-    plt.show()
+    input('finish')
 
 
 if __name__ == '__main__':
