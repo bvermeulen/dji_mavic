@@ -1,8 +1,8 @@
 ''' module for flightpath map for dji mavic pro
 '''
 import numpy as np
-from matplotlib import patches as mpl_patches
 import matplotlib.pyplot as plt
+from matplotlib import patches as mpl_patches
 from shapely.geometry import Point, LineString
 import pyproj
 from geopandas import GeoDataFrame
@@ -59,39 +59,37 @@ class MapDisplay:
         homepoint_gpd.plot(
             ax=cls.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
-        cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
+        # cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
         cls.background = cls.fig.canvas.copy_from_bbox(cls.fig.bbox)
 
-        connect = cls.fig.canvas.mpl_connect
-        connect('key_press_event', cls.on_key)
-        cls.pause = False
 
     @classmethod
+    @timed(logger)
     def add_basemap_osm(cls, source=ctx.providers.OpenStreetMap.Mapnik):
         ctx.add_basemap(cls.ax_map, source=source)
 
     @classmethod
+    @timed(logger)
     def blit(cls):
-        cls.fig.canvas.restore_region(cls.background)
-        cls.fig.canvas.blit(cls.fig.bbox)
+        cls.fig.canvas.draw()
         cls.fig.canvas.flush_events()
 
-    @classmethod
-    def on_key(cls, event):
-        if event.key == ' ':
-            cls.pause = not cls.pause
-            if cls.pause:
-                print('pause ...')
 
 class DroneFlight(MapDisplay):
 
     def __init__(self):
         self.drone = mpl_patches.Circle(
             (self.flightpoints[0].x, self.flightpoints[0].y),
-            fc=drone_color, radius=drone_size
+            fc=drone_color, radius=drone_size,
         )
         self.ax_map.add_patch(self.drone)
         self.fig.canvas.draw()
+
+        connect = self.fig.canvas.mpl_connect
+        connect('key_press_event', self.on_key)
+        self.pause = False
+
+        plt.show()
 
     def update_location(self, point):
         self.drone.center = (point.x, point.y)
@@ -100,7 +98,7 @@ class DroneFlight(MapDisplay):
         for i, point in enumerate(self.flightpoints):
             if i % 25 == 0:
                 self.update_location(point)
-                self.blit_drone()
+                self.blit()
                 print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
                       f'map collections: {len(self.ax_map.collections)}')
 
@@ -111,6 +109,16 @@ class DroneFlight(MapDisplay):
         self.fig.canvas.blit(self.fig.bbox)
         self.fig.canvas.flush_events()
 
+    def on_key(self, event):
+        if event.key == ' ':
+            self.pause = not self.pause
+            if self.pause:
+                print('pause ...')
+
+        if event.key == 's':
+            self.fly_drone()
+
+
 if __name__ == '__main__':
 
     flightdata_df = read_flightdata_csv(rc_filename)
@@ -119,8 +127,7 @@ if __name__ == '__main__':
     md = MapDisplay()
     md.setup(longitudes, latitudes)
     drone = DroneFlight()
-    plt.show(block=False)
-    plt.pause(.1)
+
     input('enter to start ...')
     drone.fly_drone()
     input('enter to finish ...')

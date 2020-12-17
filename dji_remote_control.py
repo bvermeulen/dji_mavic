@@ -34,7 +34,7 @@ class RemoteControlDisplay:
 
     @classmethod
     def blit(cls):
-        cls.fig.canvas.blit()
+        cls.fig.canvas.draw()
         cls.fig.canvas.flush_events()
 
 
@@ -125,3 +125,37 @@ class RcStick(RemoteControlDisplay):
     def rc_vals(self, val1, val2):
         self.stick_val(val1, val2)
         self.bar_val(val1, val2)
+
+    def blit_rc(self):
+        self.fig.draw_artist(self.stick)
+        self.fig.draw_artist(self.stick_end)
+        self.fig.canvas.blit()
+        self.fig.canvas.flush_events()
+
+    def draw_rc(self):
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+
+if __name__ == '__main__':
+    rcd = RemoteControlDisplay()
+    rcd.setup(120)
+    rc_left = RcStick('val 1/ val 2', left=True)
+    rc_right = RcStick('val 3/ val 4', left=False)
+    rc_left.draw_rc()
+    rc_right.draw_rc()
+    plt.show(block=False)
+
+    input('enter to continue')
+    rc_left.rc_vals(30, 70)
+    rc_right.rc_vals(-60, 20)
+    rcd.blit()
+
+    input('enter to continue')
+    rc_left.rc_vals(120, 40)
+    rc_right.rc_vals(-60, 120)
+    rc_left.blit_rc()
+    rc_right.blit_rc()
+
+    input('enter to stop')
+

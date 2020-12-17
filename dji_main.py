@@ -1,7 +1,7 @@
 ''' dji main module
 '''
 import numpy as np
-import mapplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from dji_remote_control import RemoteControlDisplay, RcStick
 from dji_flight_graphs import GraphDisplay, Graph
 from dji_map import MapDisplay, DroneFlight
@@ -19,7 +19,7 @@ rc_zero = 1024
 miles_km_conv = 1.60934
 feet_meter_conv = 0.3048
 blit_rate = 25
-show_rc = False
+show_rc = True
 show_print = False
 
 # Logging setup
@@ -89,7 +89,8 @@ def dji_main():
     def remote_control_display(index):
         rc_left.rc_vals(rc_yaw[i], rc_climb[i])
         rc_right.rc_vals(rc_roll[i], rc_pitch[i])
-        rcd.blit()
+        rc_left.blit_rc()
+        rc_right.blit_rc()
 
     @timed(logger)
     def graph_display(index):
@@ -101,7 +102,7 @@ def dji_main():
     @timed(logger)
     def drone_display(index):
         dd.update_location(dd.flightpoints[index])
-        dd.blit()
+        dd.blit_drone()
 
     @timed(logger)
     def printval(index):
@@ -111,8 +112,10 @@ def dji_main():
             f'pitch: {rc_pitch[index]:10.4f}, roll: {rc_roll[index]:10.4f}'
         )
 
-    input('start')
     plt.show(block=False)
+    plt.pause(.1)
+    input('start')
+
     for i in range(len(rc_climb)):
 
         while dd.pause:
@@ -123,7 +126,7 @@ def dji_main():
         if i % blit_rate == 0:
             if show_rc:
                 remote_control_display(i)
-            graph_display(i)
+            # graph_display(i)
             drone_display(i)
             if show_print:
                 printval(i)
