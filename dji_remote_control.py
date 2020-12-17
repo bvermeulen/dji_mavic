@@ -3,7 +3,6 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib import animation
 from matplotlib import patches as mpl_patches
 from matplotlib import lines as mpl_lines
 from dji_mavic_io import read_flightdata_csv
@@ -38,9 +37,10 @@ class RemoteControlDisplay:
         mpl.rcParams['toolbar'] = 'None'
         cls.fig = plt.figure('Remote Control', figsize=fig_size)
         cls.fig.suptitle(None)
+        cls.background = None
 
     @classmethod
-    def blit(cls):
+    def draw(cls):
         cls.fig.canvas.draw()
         cls.fig.canvas.flush_events()
 
@@ -97,10 +97,10 @@ class RcStick(RemoteControlDisplay):
         # display of stick
         self.stick_end = mpl_patches.Circle(
             (0, 0), radius=stick_end_size, fc=stick_end_color,
-            transform=self.ax_polar.transData._b, zorder=10
+            transform=self.ax_polar.transData._b, zorder=10, animated=True,
         )
         self.stick = mpl_lines.Line2D(
-            [0, 0], [0, 0], linewidth=stick_width, color=stick_color
+            [0, 0], [0, 0], linewidth=stick_width, color=stick_color, animated=True,
         )
         self.ax_polar.add_patch(self.stick_end)
         self.ax_polar.add_line(self.stick)
@@ -109,9 +109,11 @@ class RcStick(RemoteControlDisplay):
         # display of x, y bars
         self.bar_x = mpl_lines.Line2D(
             [0, 0], [0, 0], linewidth=bar_width, color=bar_color, solid_capstyle='butt',
+            animated=True,
         )
         self.bar_y = mpl_lines.Line2D(
             [0, 0], [0, 0], linewidth=bar_width, color=bar_color, solid_capstyle='butt',
+            animated=True,
         )
         self.ax_carth.add_line(self.bar_x)
         self.ax_carth.add_line(self.bar_y)
@@ -119,6 +121,8 @@ class RcStick(RemoteControlDisplay):
 
         self.ax_carth.set_title(stick_name)
         self.ax_polar.set_yticklabels([])
+
+        self.background = None
 
     def stick_val(self, x, y):
         theta, r = conv_xy_to_polar(x, y)
@@ -136,16 +140,20 @@ class RcStick(RemoteControlDisplay):
         self.bar_val(val1, val2)
 
     def blit_rc(self):
-        self.fig.draw_artist(self.stick)
-        self.fig.draw_artist(self.stick_end)
-        self.fig.draw_artist(self.bar_x)
-        self.fig.draw_artist(self.bar_y)
-        self.fig.canvas.blit()
-        self.fig.canvas.flush_events()
+        if self.background is None:
+            self.background = (
+                self.fig.canvas.copy_from_bbox(self.fig.bbox)
+            )
+            self.draw()
 
-    def draw_rc(self):
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
+        else:
+            self.fig.canvas.restore_region(self.background)
+            self.fig.draw_artist(self.stick)
+            self.fig.draw_artist(self.stick_end)
+            self.fig.draw_artist(self.bar_x)
+            self.fig.draw_artist(self.bar_y)
+            self.fig.canvas.blit()
+            self.fig.canvas.flush_events()
 
 
 if __name__ == '__main__':
@@ -171,26 +179,33 @@ if __name__ == '__main__':
     rcd.setup(120)
     rc_right = RcStick('pitch/ roll', left=False)
     rc_left = RcStick('climb/ yaw', left=True)
-    rcd.blit()
-    input('continue ...')
+    plt.show(block=False)
+    input('continue to start ...')
 
-    def init():
-        return (
-            rc_left.stick, rc_left.stick_end, rc_right.stick, rc_right.stick_end,
-            rc_left.bar_x, rc_left.bar_y, rc_right.bar_x, rc_right.bar_y,
-        )
+    # combine blit for left and right
+    def blit():
+        if rcd.background is None:
+            rcd.background = (
+                rcd.fig.canvas.copy_from_bbox(rcd.fig.bbox)
+            )
+            rcd.draw()
 
-    def rc_animate(i):
-        print(f'frame: {i}')
+        else:
+            rcd.fig.canvas.restore_region(rcd.background)
+            rcd.fig.draw_artist(rc_left.stick)
+            rcd.fig.draw_artist(rc_left.stick_end)
+            rcd.fig.draw_artist(rc_left.bar_x)
+            rcd.fig.draw_artist(rc_left.bar_y)
+            rcd.fig.draw_artist(rc_right.stick)
+            rcd.fig.draw_artist(rc_right.stick_end)
+            rcd.fig.draw_artist(rc_right.bar_x)
+            rcd.fig.draw_artist(rc_right.bar_y)
+            rcd.fig.canvas.blit()
+            rcd.fig.canvas.flush_events()
+
+    for i in range(len(rc_pitch[::1])):
         rc_left.rc_vals(rc_roll[i], rc_pitch[i])
         rc_right.rc_vals(rc_yaw[i], rc_climb[i])
-        return (
-            rc_left.stick, rc_left.stick_end, rc_right.stick, rc_right.stick_end,
-            rc_left.bar_x, rc_left.bar_y, rc_right.bar_x, rc_right.bar_y,
-        )
+        blit()
 
-    anim = animation.FuncAnimation(
-        rcd.fig, rc_animate, init_func=init, interval=1,
-        frames=len(rc_pitch), repeat=False, blit=True
-    )
-    plt.show()
+    input('enter to finish ...')

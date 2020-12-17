@@ -2,7 +2,6 @@
 '''
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import animation
 from matplotlib import patches as mpl_patches
 from shapely.geometry import Point, LineString
 import pyproj
@@ -61,7 +60,7 @@ class MapDisplay:
             ax=cls.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
         cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
-        cls.background = cls.fig.canvas.copy_from_bbox(cls.fig.bbox)
+        cls.background = None
 
 
     @classmethod
@@ -71,7 +70,7 @@ class MapDisplay:
 
     @classmethod
     @timed(logger)
-    def blit(cls):
+    def draw(cls):
         cls.fig.canvas.draw()
         cls.fig.canvas.flush_events()
 
@@ -81,7 +80,7 @@ class DroneFlight(MapDisplay):
     def __init__(self):
         self.drone = mpl_patches.Circle(
             (self.flightpoints[0].x, self.flightpoints[0].y),
-            fc=drone_color, radius=drone_size,
+            fc=drone_color, radius=drone_size, animated=True
         )
         self.ax_map.add_patch(self.drone)
         # self.fig.canvas.draw()
@@ -90,15 +89,22 @@ class DroneFlight(MapDisplay):
         connect('key_press_event', self.on_key)
         self.pause = True
 
-    def update_location(self, point):
-        self.drone.center = (point.x, point.y)
+    def update_location(self, _point):
+        self.drone.center = (_point.x, _point.y)
 
     @timed(logger)
     def blit_drone(self):
-        self.fig.canvas.restore_region(self.background)
-        self.fig.draw_artist(self.drone)
-        self.fig.canvas.blit(self.fig.bbox)
-        self.fig.canvas.flush_events()
+        if self.background is None:
+            self.background = (
+                self.fig.canvas.copy_from_bbox(self.fig.bbox)
+            )
+            self.draw()
+
+        else:
+            self.fig.canvas.restore_region(self.background)
+            self.fig.draw_artist(self.drone)
+            self.fig.canvas.blit(self.fig.bbox)
+            self.fig.canvas.flush_events()
 
     def on_key(self, event):
         if event.key == ' ':
@@ -118,21 +124,13 @@ if __name__ == '__main__':
     md = MapDisplay()
     md.setup(longitudes, latitudes)
     drone = DroneFlight()
+    plt.show(block=False)
+    plt.pause(0.1)
     input('continue ...')
 
-    flightpoints = drone.flightpoints[::1]
-    def init():
-        return drone.drone,
-
-    def animate(i):
+    for point in drone.flightpoints:
         while drone.pause:
-            drone.blit()
-        print(f'frame: {i}')
-        drone.update_location(flightpoints[i])
-        return drone.drone,
+            drone.blit_drone()
 
-    anim = animation.FuncAnimation(
-        drone.fig, animate, init_func=init, interval=1,
-        frames=len(flightpoints), repeat=False, blit=True
-    )
-    plt.show()
+        drone.update_location(point)
+        drone.blit_drone()
