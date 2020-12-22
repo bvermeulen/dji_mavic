@@ -1,11 +1,18 @@
 ''' dji main module
 '''
 import numpy as np
+import matplotlib.pyplot as plt
 from dji_remote_control import RemoteControlDisplay, RcStick
 from dji_flight_graphs import GraphDisplay, Graph
 from dji_map import MapDisplay, DroneFlight
 from dji_mavic_io import read_flightdata_csv
+from utils.plogger import Logger, timed
 
+#pylint: disable=no-value-for-parameter
+
+# for faster plotting check:
+# https://stackoverflow.com/questions/40126176/fast-live-plotting-in-matplotlib-pyplot
+# https://matplotlib.org/3.3.1/tutorials/advanced/blitting.html
 
 rc_filename = 'dji_mavic_test_data_2.csv'
 rc_max = 1684
@@ -13,7 +20,11 @@ rc_min = 364
 rc_zero = 1024
 miles_km_conv = 1.60934
 feet_meter_conv = 0.3048
-blit_rate = 25
+samplerate = 7
+
+# Logging setup
+Logger.set_logger('dji_main.log', '%(asctime)s:%(levelname)s:%(message)s', 'INFO')
+logger = Logger.getlogger()
 
 
 def dji_main():
@@ -71,38 +82,66 @@ def dji_main():
     latitudes = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
     md = MapDisplay()
     md.setup(longitudes, latitudes)
-    drone = DroneFlight()
+    dd = DroneFlight()
+    plt.show(block=False)
 
-    input('start')
-    for i, (climb, yaw, pitch, roll)  in enumerate(
-            zip(rc_climb, rc_yaw, rc_pitch, rc_roll)):
+    input('enter to start ...')
 
-        while rcd.pause:
-            rcd.blit()
-
-        # blot diplay for every second of the flight (10 x 100 ms)
-        # nominal there may be gaps if reception is poor
-        if i % blit_rate == 0:
-            rc_left.rc_vals(yaw, climb)
-            rc_right.rc_vals(roll, pitch)
-            rcd.blit()
-
-            graph_height.update(fl_time[:i], fl_height[:i])
-            graph_speed.update(fl_time[:i], fl_speed[:i])
-            graph_dist.update(fl_time[:i], fl_dist[:i])
-            gd.blit()
-
-            drone.update_location(drone.flightpoints[i])
-            drone.blit()
-
-        if i % blit_rate == 0:
-            print(
-                f'time: {i:5}, climb: {climb:10.4f}, yaw: {yaw:10.4f}, '
-                f'pitch: {pitch:10.4f}, roll: {roll:10.4f}'
+    # combined blit for remote control
+    @timed(logger)
+    def rc_blit():
+        if rcd.background is None:
+            rcd.background = (
+                rcd.fig.canvas.copy_from_bbox(rcd.fig.bbox)
             )
+            rcd.draw()
 
-    input('finish')
+        else:
+            rcd.fig.canvas.restore_region(rcd.background)
+            rcd.fig.draw_artist(rc_left.stick)
+            rcd.fig.draw_artist(rc_left.stick_end)
+            rcd.fig.draw_artist(rc_left.bar_x)
+            rcd.fig.draw_artist(rc_left.bar_y)
+            rcd.fig.draw_artist(rc_right.stick)
+            rcd.fig.draw_artist(rc_right.stick_end)
+            rcd.fig.draw_artist(rc_right.bar_x)
+            rcd.fig.draw_artist(rc_right.bar_y)
+            rcd.fig.canvas.blit()
+            rcd.fig.canvas.flush_events()
 
+    @timed(logger)
+    def gr_blit():
+        if gd.background is None:
+            gd.background = (
+                gd.fig.canvas.copy_from_bbox(gd.fig.bbox)
+            )
+            gd.draw()
+
+        else:
+            gd.fig.canvas.restore_region(gd.background)
+            gd.fig.draw_artist(graph_height.graph)
+            gd.fig.draw_artist(graph_speed.graph)
+            gd.fig.draw_artist(graph_dist.graph)
+            gd.fig.canvas.blit()
+            rcd.fig.canvas.flush_events()
+
+    for index in range(0, len(fl_time), samplerate):
+        rc_left.rc_vals(rc_yaw[index], rc_climb[index])
+        rc_right.rc_vals(rc_roll[index], rc_pitch[index])
+        rc_blit()
+
+        graph_height.update(fl_time[:index], fl_height[:index])
+        graph_speed.update(fl_time[:index], fl_speed[:index])
+        graph_dist.update(fl_time[:index], fl_dist[:index])
+        gr_blit()
+
+        while dd.pause:
+            dd.blit_drone()
+
+        dd.update_location(dd.flightpoints[index])
+        dd.blit_drone()
+
+    input('enter to finish ...')
 
 if __name__ == '__main__':
     dji_main()

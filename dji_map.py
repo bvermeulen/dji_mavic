@@ -1,13 +1,16 @@
 ''' module for flightpath map for dji mavic pro
 '''
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import patches as mpl_patches
 from shapely.geometry import Point, LineString
 import pyproj
 from geopandas import GeoDataFrame
 import contextily as ctx
 from dji_mavic_io import read_flightdata_csv
+from utils.plogger import Logger, timed
+
+#pylint: disable=no-value-for-parameter
 
 rc_filename = 'dji_mavic_test_data_2.csv'
 fig_size = (6, 6)
@@ -17,9 +20,12 @@ flightpath_color = 'grey'
 homepoint_color = 'red'
 homepoint_size = 500
 drone_color = 'blue'
-drone_size = 100
+drone_size = 15
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
-plt.ion()
+
+# Logging setup
+Logger.set_logger('dji_map.log', '%(asctime)s:%(levelname)s:%(message)s', 'INFO')
+logger = Logger.getlogger()
 
 
 class MapDisplay:
@@ -30,7 +36,6 @@ class MapDisplay:
         cls.fig, cls.ax_map = plt.subplots(figsize=fig_size)
         cls.fig.canvas.set_window_title('Drone flightpath')
         cls.fig.suptitle(None)
-        # cls.background = cls.fig.canvas.copy_from_bbox(cls.fig.bbox)
 
         # create flightpoints and flightpath in osm projection
         cls.flightpoints = [
@@ -55,50 +60,60 @@ class MapDisplay:
             ax=cls.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
         cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
+        cls.background = None
+
 
     @classmethod
+    @timed(logger)
     def add_basemap_osm(cls, source=ctx.providers.OpenStreetMap.Mapnik):
         ctx.add_basemap(cls.ax_map, source=source)
 
     @classmethod
-    def blit(cls):
-        # cls.fig.canvas.restore_region(cls.background)
-        # cls.fig.canvas.draw()
-        cls.fig.canvas.blit(cls.fig.bbox)
+    @timed(logger)
+    def draw(cls):
+        cls.fig.canvas.draw()
         cls.fig.canvas.flush_events()
 
 
 class DroneFlight(MapDisplay):
 
     def __init__(self):
-
-        self.drone_gpd = GeoDataFrame(geometry=[self.flightpoints[0]])
-        self.drone_gpd.crs = EPSG_OSM
-
-        self.drone_gpd.plot(
-            ax=self.ax_map, marker='o', color=drone_color,
-            markersize=drone_size, gid='drone'
+        self.drone = mpl_patches.Circle(
+            (self.flightpoints[0].x, self.flightpoints[0].y),
+            fc=drone_color, radius=drone_size, animated=True
         )
+        self.ax_map.add_patch(self.drone)
+        # self.fig.canvas.draw()
 
-    def update_location(self, point):
-        # below assumes ax_map 3rd collection item is the drone plot, this may not always
-        # be true. In that case use the commented code below
-        # for plot_object in self.ax_map.collections:
-        #     if plot_object.get_gid() == 'drone':
-        #         plot_object.remove()
-        self.ax_map.collections[2].remove()
-        self.drone_gpd.set_geometry([point], inplace=True)
-        self.drone_gpd.plot(
-            ax=self.ax_map, marker='o', color='blue', markersize=100, gid='drone'
-        )
+        connect = self.fig.canvas.mpl_connect
+        connect('key_press_event', self.on_key)
+        self.pause = True
 
-    def fly_drone(self):
-        for i, point in enumerate(self.flightpoints):
-            if i % 20 == 0:
-                self.update_location(point)
-                print(f'{i:6}, long: {point.x:10.4f}, lat {point.y:10.4f}, '
-                      f'map collections: {len(self.ax_map.collections)}')
-                self.blit()
+    def update_location(self, _point):
+        self.drone.center = (_point.x, _point.y)
+
+    @timed(logger)
+    def blit_drone(self):
+        if self.background is None:
+            self.background = (
+                self.fig.canvas.copy_from_bbox(self.fig.bbox)
+            )
+            self.draw()
+
+        else:
+            self.fig.canvas.restore_region(self.background)
+            self.fig.draw_artist(self.drone)
+            self.fig.canvas.blit(self.fig.bbox)
+            self.fig.canvas.flush_events()
+
+    def on_key(self, event):
+        if event.key == ' ':
+            self.pause = not self.pause
+            if self.pause:
+                print('pause ...')
+
+        if event.key == 's':
+            self.fly_drone()
 
 
 if __name__ == '__main__':
@@ -109,7 +124,13 @@ if __name__ == '__main__':
     md = MapDisplay()
     md.setup(longitudes, latitudes)
     drone = DroneFlight()
+    plt.show(block=False)
+    plt.pause(0.1)
+    input('continue ...')
 
-    input('enter to start ...')
-    drone.fly_drone()
-    input('enter to finish ...')
+    for point in drone.flightpoints:
+        while drone.pause:
+            drone.blit_drone()
+
+        drone.update_location(point)
+        drone.blit_drone()
