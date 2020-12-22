@@ -14,7 +14,7 @@ from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from dji_mavic_io import read_flightdata_csv
 from dji_remote_control import RemoteControlDisplay, RcStick
-from dji_flight_graphs import GraphDisplay, Graph
+from dji_flight_graphs import GraphDisplay
 from dji_map import MapDisplay, DroneFlight
 
 
@@ -26,8 +26,7 @@ left_arrow_symbol = '\u25C0'
 rc_max = 1684
 rc_min = 364
 rc_zero = 1024
-miles_km_conv = 1.60934
-feet_meter_conv = 0.3048
+
 samplerate = 7
 
 
@@ -37,36 +36,7 @@ class DashboardShow(QWidget):
         super().__init__()
         flightdata_df = read_flightdata_csv(filename)
 
-        self.fl_time = np.array(
-            flightdata_df['time(millisecond)'].to_list(), dtype=np.float64
-        ) / 1000
-        self.gd = GraphDisplay()
-        self.gd.setup(max(self.fl_time))
-        ax_height = self.gd.get_ax_graph_1()
-        ax_speed = self.gd.get_ax_graph_2()
-        ax_dist = self.gd.get_ax_graph_3()
-
-        self.fl_height = np.array(
-            flightdata_df['height_above_takeoff(feet)'].to_list(), dtype=np.float64
-        )
-        self.graph_height = Graph(
-            ax_height, 'height', 'feet', min(self.fl_height), max(self.fl_height),
-            self.fl_time, self.fl_height,
-        )
-        self.fl_speed = np.array(
-            flightdata_df['speed(mph)'].to_list(), dtype=np.float64
-        ) * miles_km_conv
-        self.graph_speed = Graph(
-            ax_speed, 'speed', 'kph', min(self.fl_speed), max(self.fl_speed),
-            self.fl_time, self.fl_speed,
-        )
-        self.fl_dist = np.array(
-            flightdata_df['distance(feet)'].to_list(), dtype=np.float64
-        ) * feet_meter_conv
-        self.graph_dist = Graph(
-            ax_dist, 'distance', 'meter', min(self.fl_dist), max(self.fl_dist),
-            self.fl_time, self.fl_dist,
-        )
+        self.gd = GraphDisplay(flightdata_df)
 
         self.rc_climb = np.array(flightdata_df['rc_throttle'].to_list(), dtype=np.float64)
         self.rc_yaw = np.array(flightdata_df['rc_rudder'].to_list(), dtype=np.float64)
@@ -168,30 +138,13 @@ class DashboardShow(QWidget):
                 self.rc.fig.canvas.blit()
                 self.rc.fig.canvas.flush_events()
 
-        def gd_blit():
-            if self.gd.background is None:
-                self.gd.background = (
-                    self.gd.fig.canvas.copy_from_bbox(self.gd.fig.bbox)
-                )
-                self.gd.draw()
-
-            else:
-                self.gd.fig.canvas.restore_region(self.gd.background)
-                self.gd.fig.draw_artist(self.graph_height.graph)
-                self.gd.fig.draw_artist(self.graph_speed.graph)
-                self.gd.fig.draw_artist(self.graph_dist.graph)
-                self.gd.fig.canvas.blit()
-                self.gd.fig.canvas.flush_events()
-
         for index in range(0, len(self.dd.flightpoints), samplerate):
             self.rc_left.rc_vals(self.rc_yaw[index], self.rc_climb[index])
             self.rc_right.rc_vals(self.rc_roll[index], self.rc_pitch[index])
             rc_blit()
 
-            self.graph_height.update(self.fl_time[:index], self.fl_height[:index])
-            self.graph_speed.update(self.fl_time[:index], self.fl_speed[:index])
-            self.graph_dist.update(self.fl_time[:index], self.fl_dist[:index])
-            gd_blit()
+            self.gd.update(index)
+            self.gd.blit()
 
             while self.dd.pause:
                 self.dd.blit_drone()
@@ -214,4 +167,4 @@ def main(filename=None):
 
 
 if __name__ == '__main__':
-    main(filename='./dji_mavic_test_data_2.csv')
+    main(filename='./dji_mavic_test_data.csv')
