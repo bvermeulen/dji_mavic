@@ -20,7 +20,7 @@ rc_min = 364
 rc_zero = 1024
 miles_km_conv = 1.60934
 feet_meter_conv = 0.3048
-samplerate = 3
+samplerate = 7
 
 # Logging setup
 Logger.set_logger('dji_main.log', '%(asctime)s:%(levelname)s:%(message)s', 'INFO')
