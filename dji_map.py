@@ -87,6 +87,7 @@ class DroneFlight(MapDisplay):
 
         connect = self.fig.canvas.mpl_connect
         connect('key_press_event', self.on_key)
+        connect('resize_event', self.on_resize)
         self.pause = True
 
     def update_location(self, _point):
@@ -115,6 +116,10 @@ class DroneFlight(MapDisplay):
         if event.key == 's':
             self.fly_drone()
 
+    def on_resize(self, event):
+        print('resizing ...')
+        # self.pause = True
+        self.background = None
 
 if __name__ == '__main__':
 
@@ -128,7 +133,7 @@ if __name__ == '__main__':
     plt.pause(0.1)
     input('continue ...')
 
-    for point in drone.flightpoints:
+    for point in drone.flightpoints[::2]:
         while drone.pause:
             drone.blit_drone()
 

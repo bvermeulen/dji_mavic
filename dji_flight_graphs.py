@@ -40,31 +40,25 @@ class GraphDisplay:
 
         # height graph
         self.ax_height.plot(
-                self.fl_time, self.fl_height, color=graph_light_color, linewidth=graph_lw,
-        )
+            self.fl_time, self.fl_height, color=graph_light_color, linewidth=graph_lw,)
         self.graph_height, = self.ax_height.plot(
-            [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,
-        )
+            [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,)
         self.ax_height.set_ylim(min(self.fl_height)*1.1, max(self.fl_height)*1.1)
         self.ax_height.set_ylabel('Height\n(feet)')
 
         # speed graph
         self.ax_speed.plot(
-                self.fl_time, self.fl_speed, color=graph_light_color, linewidth=graph_lw,
-        )
+            self.fl_time, self.fl_speed, color=graph_light_color, linewidth=graph_lw,)
         self.graph_speed, = self.ax_speed.plot(
-            [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,
-        )
+            [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,)
         self.ax_speed.set_ylim(min(self.fl_speed)*1.1, max(self.fl_speed)*1.1)
         self.ax_speed.set_ylabel('Velocity\n(km/ hour)')
 
         # distance graph
         _ = self.ax_dist.plot(
-                self.fl_time, self.fl_dist, color=graph_light_color, linewidth=graph_lw,
-        )
+            self.fl_time, self.fl_dist, color=graph_light_color, linewidth=graph_lw,)
         self.graph_dist, = self.ax_dist.plot(
-            [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,
-        )
+            [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,)
         self.ax_dist.set_ylim(min(self.fl_dist)*1.1, max(self.fl_dist)*1.1)
         self.ax_dist.set_ylabel('Distance\n(meter)')
 
