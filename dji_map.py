@@ -8,7 +8,7 @@ import pyproj
 from geopandas import GeoDataFrame
 import contextily as ctx
 from dji_mavic_io import read_flightdata_csv
-from utils.plogger import Logger, timed
+from utils.plogger import Logger
 
 #pylint: disable=no-value-for-parameter
 
@@ -29,72 +29,74 @@ logger = Logger.getlogger()
 
 
 class MapDisplay:
+    ''' display of drone with osm map in background
+        methods:
+            add_basemap_osm: set background map from ctx.providers.OpenStreetMap.Mapnik
+            draw: initial draw
+            update_location: update drone location
+            blit: blit the drone on the map
+            on_key: pause on key
+            on_resize: redraws on resize
+    '''
 
-    @classmethod
-    def setup(cls, lons, lats):
-
-        cls.fig, cls.ax_map = plt.subplots(figsize=fig_size)
-        cls.fig.canvas.set_window_title('Drone flightpath')
-        cls.fig.suptitle(None)
+    def __init__(self, flightdata_df):
 
         # create flightpoints and flightpath in osm projection
-        cls.flightpoints = [
+        lons = np.array(flightdata_df['longitude'].to_list(), dtype=np.float64)
+        lats = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
+        self.flightpoints = [
             Point(xy) for xy in tr_wgs_osm.itransform([xy for xy in zip(lats, lons)])
         ]
-
-        cls.flightpath = [
+        self.flightpath = [
             LineString([point1, point2]) for point1, point2
-            in zip(cls.flightpoints, cls.flightpoints[1:])
+            in zip(self.flightpoints, self.flightpoints[1:])
         ]
-        flightpath_gpd = GeoDataFrame(geometry=cls.flightpath)
+        flightpath_gpd = GeoDataFrame(geometry=self.flightpath)
         flightpath_gpd.crs = EPSG_OSM
         print(flightpath_gpd.head(-100))
 
         # set the homepoint and convert to map projection
-        homepoint_gpd = GeoDataFrame(geometry=[cls.flightpoints[0]])
+        homepoint_gpd = GeoDataFrame(geometry=[self.flightpoints[0]])
         homepoint_gpd.crs = EPSG_OSM
 
-        # plot the flightpath in grey and convert to map projection
-        flightpath_gpd.plot(ax=cls.ax_map, color=flightpath_color)
+        # create the figure and axes
+        self.fig, self.ax_map = plt.subplots(figsize=fig_size)
+        self.fig.canvas.set_window_title('Drone flightpath')
+        self.fig.suptitle(None)
+
+        # plot the flightpath in grey and convert to map projection and add basemap
+        flightpath_gpd.plot(ax=self.ax_map, color=flightpath_color)
         homepoint_gpd.plot(
-            ax=cls.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
+            ax=self.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
-        cls.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
-        cls.background = None
+        self.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
+        self.background = None
 
-
-    @classmethod
-    @timed(logger)
-    def add_basemap_osm(cls, source=ctx.providers.OpenStreetMap.Mapnik):
-        ctx.add_basemap(cls.ax_map, source=source)
-
-    @classmethod
-    @timed(logger)
-    def draw(cls):
-        cls.fig.canvas.draw()
-        cls.fig.canvas.flush_events()
-
-
-class DroneFlight(MapDisplay):
-
-    def __init__(self):
+        # add the drone
         self.drone = mpl_patches.Circle(
             (self.flightpoints[0].x, self.flightpoints[0].y),
             fc=drone_color, radius=drone_size, animated=True
         )
         self.ax_map.add_patch(self.drone)
-        # self.fig.canvas.draw()
 
+        # make connections for key and figure resize
         connect = self.fig.canvas.mpl_connect
         connect('key_press_event', self.on_key)
         connect('resize_event', self.on_resize)
         self.pause = True
 
-    def update_location(self, _point):
-        self.drone.center = (_point.x, _point.y)
+    def add_basemap_osm(self, source=ctx.providers.OpenStreetMap.Mapnik):
+        ctx.add_basemap(self.ax_map, source=source)
 
-    @timed(logger)
-    def blit_drone(self):
+    def draw(self):
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    def update_location(self, index):
+        point = self.flightpoints[index]
+        self.drone.center = (point.x, point.y)
+
+    def blit(self):
         if self.background is None:
             self.background = (
                 self.fig.canvas.copy_from_bbox(self.fig.bbox)
@@ -110,32 +112,33 @@ class DroneFlight(MapDisplay):
     def on_key(self, event):
         if event.key == ' ':
             self.pause = not self.pause
-            if self.pause:
-                print('pause ...')
 
         if event.key == 's':
             self.fly_drone()
 
     def on_resize(self, event):
-        print('resizing ...')
-        # self.pause = True
         self.background = None
 
-if __name__ == '__main__':
+    def on_close(self):
+        plt.close(self.fig)
 
+    def __repr__(self):
+        return (f'drone homepoint at: '
+                f'{int(self.flightpoints[0].x):,}, {int(self.flightpoints[0].y):,}')
+
+
+if __name__ == '__main__':
+    samplerate = 2
     flightdata_df = read_flightdata_csv(rc_filename)
-    longitudes = np.array(flightdata_df['longitude'].to_list(), dtype=np.float64)
-    latitudes = np.array(flightdata_df['latitude'].to_list(), dtype=np.float64)
-    md = MapDisplay()
-    md.setup(longitudes, latitudes)
-    drone = DroneFlight()
+    md = MapDisplay(flightdata_df)
+    print(md)
     plt.show(block=False)
     plt.pause(0.1)
     input('continue ...')
 
-    for point in drone.flightpoints[::2]:
-        while drone.pause:
-            drone.blit_drone()
+    for index in range(0, len(flightdata_df), samplerate):
+        while md.pause:
+            md.blit()
 
-        drone.update_location(point)
-        drone.blit_drone()
+        md.update_location(index)
+        md.blit()

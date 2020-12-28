@@ -1,4 +1,4 @@
-''' module remote control for DJI Mavic Pro
+''' module for remote control for dji mavic pro
 '''
 import numpy as np
 import matplotlib as mpl
@@ -26,18 +26,30 @@ stick_color = 'blue'
 stick_width = 3
 bar_color = 'orange'
 bar_width = 5
+title_left = 'climb/ yaw'
+title_right = 'pitch/ roll'
 
 rc_max = 1684
 rc_min = 364
 rc_zero = 1024
 
-samplerate = 1
 
 def conv_xy_to_polar(x, y):
     return np.degrees(np.arctan2(y, x)), np.sqrt(x*x + y*y)
 
 
 class RemoteControlDisplay:
+    ''' display of remote control with left and right sticks
+        methods:
+            __init__: requires as arg a flightdata dataframe from UAV Drone
+            setup_rc: setup left and right remote controls on console
+            draw: initial draw of console
+            update_stick: update remote control sticks display
+            update_bar: update x, y bars of remote controls display
+            update: update values for climb, yaw, pitch and roll from fligtdata
+            blit: blit the remote control sticks and bars
+            on_resize: redraw console on resize
+    '''
 
     def __init__(self, flightdata_df):
         # get axes from fligh data dataframe
@@ -61,14 +73,18 @@ class RemoteControlDisplay:
         self.fig = plt.figure('Remote Control', figsize=fig_size)
         self.fig.suptitle(None)
         self.background = None
+
         self.ax_carth = {}
         self.ax_polar = {}
         self.stick = {}
         self.stick_end = {}
         self.bar_x = {}
         self.bar_y = {}
-        self.setup_rc('climb/ yaw', 'left')
-        self.setup_rc('pitch/ roll', 'right')
+        self.setup_rc(title_left, 'left')
+        self.setup_rc(title_right, 'right')
+
+        connect = self.fig.canvas.mpl_connect
+        connect('resize_event', self.on_resize)
 
     def setup_rc(self, stick_name: str, rc_key: str):
         if rc_key == 'left':
@@ -124,7 +140,7 @@ class RemoteControlDisplay:
         )
         self.ax_polar[rc_key].add_patch(self.stick_end[rc_key])
         self.ax_polar[rc_key].add_line(self.stick[rc_key])
-        self.stick_val(0, 0, rc_key)
+        self.update_stick(0, 0, rc_key)
 
         # display of x, y bars
         self.bar_x[rc_key] = mpl_lines.Line2D(
@@ -137,7 +153,7 @@ class RemoteControlDisplay:
         )
         self.ax_carth[rc_key].add_line(self.bar_x[rc_key])
         self.ax_carth[rc_key].add_line(self.bar_y[rc_key])
-        self.bar_val(0, 0, rc_key)
+        self.update_bar(0, 0, rc_key)
 
         self.ax_carth[rc_key].set_title(stick_name)
         self.ax_polar[rc_key].set_yticklabels([])
@@ -146,27 +162,27 @@ class RemoteControlDisplay:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-    def stick_val(self, x, y, rc_key):
+    def update_stick(self, x, y, rc_key):
         theta, r = conv_xy_to_polar(x, y)
         self.stick_end[rc_key].center = (x, y)
         self.stick[rc_key].set_data([0, np.radians(theta)], [0, r])
 
-    def bar_val(self, x, y, rc_key):
+    def update_bar(self, x, y, rc_key):
         # from (0, -xymax) to (x, -xymax)
         self.bar_x[rc_key].set_data([0, x], [-xymax, -xymax])
         # from (xymax, 0) to (xymax, y)
         self.bar_y[rc_key].set_data([-xymax, -xymax], [0, y])
 
-    def rc_vals(self, index):
+    def update(self, index):
         val1 = self.rc_yaw[index]
         val2 = self.rc_climb[index]
-        self.stick_val(val1, val2, 'left')
-        self.bar_val(val1, val2, 'left')
+        self.update_stick(val1, val2, 'left')
+        self.update_bar(val1, val2, 'left')
 
         val1 = self.rc_roll[index]
         val2 = self.rc_pitch[index]
-        self.stick_val(val1, val2, 'right')
-        self.bar_val(val1, val2, 'right')
+        self.update_stick(val1, val2, 'right')
+        self.update_bar(val1, val2, 'right')
 
     def blit(self):
         if self.background is None:
@@ -188,15 +204,26 @@ class RemoteControlDisplay:
             self.fig.canvas.blit()
             self.fig.canvas.flush_events()
 
+    def on_resize(self, event):
+        self.background = None
+
+    def on_close(self):
+        plt.close(self.fig)
+
+    def __repr__(self):
+        return f'Remote Control: left: {title_left}, right: {title_right}'
 
 if __name__ == '__main__':
+    samplerate = 1
     flightdata_df = read_flightdata_csv('dji_mavic_test_data.csv')
     rcd = RemoteControlDisplay(flightdata_df)
     plt.show(block=False)
+    plt.pause(0.1)
+    print(rcd)
     input('continue to start ...')
 
     for i in range(0, len(flightdata_df), samplerate):
-        rcd.rc_vals(i)
+        rcd.update(i)
         rcd.blit()
 
     input('enter to finish ...')

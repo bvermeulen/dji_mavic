@@ -1,10 +1,9 @@
-''' module for flight graphs dji mavic pro
+''' module for flight graphs for dji mavic pro
 '''
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-# from matplotlib import patches as mpl_patches
-# from matplotlib import lines as mpl_lines
+from dji_mavic_io import read_flightdata_csv
 
 
 FEET_METER_CONV = 0.3048
@@ -15,18 +14,30 @@ graph_dark_color = 'black'
 graph_lw = 0.5
 graph_xlabel = 'time (s)'
 
+
 class GraphDisplay:
+    ''' display of graphs for height, speed and distance
+        methods:
+            setup_graphs: setup for graphs for height, speed and distance
+            draw: initial draw
+            update: update graph values
+            blit: blit the graphs
+            on_resize: redraws graphs on resize
+    '''
 
     def __init__(self, flightdata_df):
         mpl.rcParams['toolbar'] = 'None'
-        self.fig, (self.ax_speed, self.ax_height, self.ax_dist) = plt.subplots(
+        self.fig, (self.ax_height, self.ax_speed, self.ax_dist) = plt.subplots(
             nrows=3, ncols=1, figsize=fig_size, sharex='all')
         self.fig.canvas.set_window_title('Flight graphs')
         self.fig.suptitle(None)
         self.background = None
-        # self.fig.tight_layout()
 
+        # self.fig.tight_layout()
         self.setup_graphs(flightdata_df)
+
+        connect = self.fig.canvas.mpl_connect
+        connect('resize_event', self.on_resize)
 
     def setup_graphs(self, flightdata_df):
         self.fl_time = np.array(
@@ -52,7 +63,7 @@ class GraphDisplay:
         self.graph_speed, = self.ax_speed.plot(
             [0], [0], color=graph_dark_color, linewidth=graph_lw, animated=True,)
         self.ax_speed.set_ylim(min(self.fl_speed)*1.1, max(self.fl_speed)*1.1)
-        self.ax_speed.set_ylabel('Velocity\n(km/ hour)')
+        self.ax_speed.set_ylabel('Speed\n(km/ hour)')
 
         # distance graph
         _ = self.ax_dist.plot(
@@ -89,3 +100,28 @@ class GraphDisplay:
             self.fig.draw_artist(self.graph_dist)
             self.fig.canvas.blit()
             self.fig.canvas.flush_events()
+
+    def on_resize(self, event):
+        self.background = None
+
+    def on_close(self):
+        plt.close(self.fig)
+
+    def __repr__(self):
+        return 'graphs: height, speed, distance'
+
+
+if __name__ == '__main__':
+    samplerate = 5
+    flightdata_df = read_flightdata_csv('dji_mavic_test_data.csv')
+    gd = GraphDisplay(flightdata_df)
+    plt.show(block=False)
+    plt.pause(0.1)
+    print(gd)
+    input('continue to start ...')
+
+    for i in range(0, len(flightdata_df), samplerate):
+        gd.update(i)
+        gd.blit()
+
+    input('enter to finish ...')
