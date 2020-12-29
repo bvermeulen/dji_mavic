@@ -43,7 +43,7 @@ class DashboardShow(QWidget):
         self.initUI()
 
         self.move(400, 300)
-        self.setWindowTitle('DJI Mavi Pro ... ')
+        self.setWindowTitle('DJI Mavic Pro ... ')
         self.show()
 
 
