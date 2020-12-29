@@ -3,16 +3,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches as mpl_patches
-from shapely.geometry import Point, LineString
 import pyproj
+from shapely.geometry import Point, LineString
 from geopandas import GeoDataFrame
 import contextily as ctx
 from dji_mavic_io import read_flightdata_csv
-from utils.plogger import Logger
 
 #pylint: disable=no-value-for-parameter
 
-rc_filename = 'dji_mavic_test_data_2.csv'
 fig_size = (6, 6)
 EPSG_WGS84 = 4326
 EPSG_OSM = 3857
@@ -22,10 +20,6 @@ homepoint_size = 500
 drone_color = 'blue'
 drone_size = 15
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
-
-# Logging setup
-Logger.set_logger('dji_map.log', '%(asctime)s:%(levelname)s:%(message)s', 'INFO')
-logger = Logger.getlogger()
 
 
 class MapDisplay:
@@ -119,7 +113,8 @@ class MapDisplay:
     def on_resize(self, event):
         self.background = None
 
-    def on_close(self):
+    def remove_fig(self):
+        self.background = None
         plt.close(self.fig)
 
     def __repr__(self):
@@ -129,6 +124,8 @@ class MapDisplay:
 
 if __name__ == '__main__':
     samplerate = 2
+    rc_filename = 'dji_mavic_test_data_2.csv'
+
     flightdata_df = read_flightdata_csv(rc_filename)
     md = MapDisplay(flightdata_df)
     print(md)

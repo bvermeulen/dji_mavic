@@ -207,7 +207,7 @@ class RemoteControlDisplay:
     def on_resize(self, event):
         self.background = None
 
-    def on_close(self):
+    def remove_fig(self):
         plt.close(self.fig)
 
     def __repr__(self):

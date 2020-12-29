@@ -1,21 +1,21 @@
 ''' application to show dji mavic drone flights from UAV Drone csv files
 '''
-#TODO load csv files with qt dialogue, probably have to use QStackedWidget to be able to load another csv file
-#TODO port to QGIS
-
 import sys
-import numpy as np
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QApplication, QPushButton, QFileDialog
-)
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import (
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QApplication, QPushButton,
+    QFileDialog, QStackedWidget,
+)
 from dji_mavic_io import read_flightdata_csv
 from dji_remote_control import RemoteControlDisplay
 from dji_flight_graphs import GraphDisplay
 from dji_map import MapDisplay
 
+#TODO port to QGIS
+
+#pylint: disable=c-extension-no-member
 
 
 anticlockwise_symbol = '\u21b6'
@@ -30,12 +30,15 @@ class DashboardShow(QWidget):
     def __init__(self):
         super().__init__()
         self.flightflightdata_df = None
-        self.md_canvas = FigureCanvas(Figure())
-        self.gd_canvas = FigureCanvas(Figure())
-        self.rc_canvas = FigureCanvas(Figure())
-        self.md = None
-        self.gd = None
-        self.rcd = None
+        self.md, self.gd, self.rcd = None, None, None
+
+        self.md_stack = QStackedWidget(self)
+        self.md_stack.addWidget(FigureCanvas(Figure()))
+        self.gd_stack = QStackedWidget(self)
+        self.gd_stack.addWidget(FigureCanvas(Figure()))
+        self.rc_stack = QStackedWidget(self)
+        self.rc_stack.addWidget(FigureCanvas(Figure()))
+        self.stack_depth = 0
 
         self.initUI()
 
@@ -52,11 +55,11 @@ class DashboardShow(QWidget):
         self.hbox_displays = QHBoxLayout()
 
         vbox_left = QVBoxLayout()
-        vbox_left.addWidget(self.gd_canvas)
-        vbox_left.addWidget(self.rc_canvas)
+        vbox_left.addWidget(self.gd_stack)
+        vbox_left.addWidget(self.rc_stack)
 
         self.hbox_displays.addLayout(vbox_left)
-        self.hbox_displays.addWidget(self.md_canvas)
+        self.hbox_displays.addWidget(self.md_stack)
 
         # setup status line
         hbox_statusline = QHBoxLayout()
@@ -91,38 +94,45 @@ class DashboardShow(QWidget):
 
         self.setLayout(mainbox)
 
-
     def cntr_open(self):
         self.filename, _ = QFileDialog.getOpenFileName(self, 'OpenFile')
-        print(self.filename)
-        if not self.filename:
+        #TODO add filename checker and handle case there is no lat-lon
+        self.flightdata_df = read_flightdata_csv(self.filename)
+
+        if self.flightdata_df.empty:
             return
 
         if self.md:
-            self.rcd.on_close()
-            self.gd.on_close()
-            self.md.on_close()
+            self.rcd.remove_fig()
+            self.gd.remove_fig()
+            self.md.remove_fig()
 
-        self.flightdata_df = read_flightdata_csv(self.filename)
         self.samples = len(self.flightdata_df)
         self.rcd = RemoteControlDisplay(self.flightdata_df)
         self.gd = GraphDisplay(self.flightdata_df)
         self.md = MapDisplay(self.flightdata_df)
 
         md_canvas = FigureCanvas(self.md.fig)
-        self.hbox_displays.replaceWidget(self.md_canvas, md_canvas)
         gd_canvas = FigureCanvas(self.gd.fig)
-        self.hbox_displays.replaceWidget(self.gd_canvas, gd_canvas)
         rc_canvas = FigureCanvas(self.rcd.fig)
-        self.hbox_displays.replaceWidget(self.rc_canvas, rc_canvas)
 
         md_canvas.mpl_connect('resize_event', self.md.on_resize)
         gd_canvas.mpl_connect('resize_event', self.gd.on_resize)
         rc_canvas.mpl_connect('resize_event', self.rcd.on_resize)
 
-        self.md_cancvas = md_canvas
-        self.gd_cancvas = gd_canvas
-        self.rc_cancvas = rc_canvas
+        self.md_stack.addWidget(md_canvas)
+        self.gd_stack.addWidget(gd_canvas)
+        self.rc_stack.addWidget(rc_canvas)
+        self.stack_depth += 1
+        print(f'stack depth: {self.stack_depth}')
+
+        self.md_stack.setCurrentIndex(self.stack_depth)
+        self.gd_stack.setCurrentIndex(self.stack_depth)
+        self.rc_stack.setCurrentIndex(self.stack_depth)
+
+        self.md.on_resize(None)
+        self.gd.on_resize(None)
+        self.rcd.on_resize(None)
 
     def cntr_run(self):
         if self.flightdata_df is None:
@@ -149,14 +159,14 @@ class DashboardShow(QWidget):
 
     def cntr_quit(self):
         self.close()
+        sys.exit()
 
 
-def main(filename=None):
+def main():
     app = QApplication([])
-
-    pic_show = DashboardShow()
+    _ = DashboardShow()
     sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
-    main(filename='./dji_mavic_test_data_2.csv')
+    main()
