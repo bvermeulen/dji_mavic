@@ -29,8 +29,9 @@ class DashboardShow(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.flightflightdata_df = None
         self.md, self.gd, self.rcd = None, None, None
+        self.samples = None
+        self.cntr_enabled = False
 
         self.md_stack = QStackedWidget(self)
         self.md_stack.addWidget(FigureCanvas(Figure()))
@@ -97,20 +98,52 @@ class DashboardShow(QWidget):
     def cntr_open(self):
         self.filename, _ = QFileDialog.getOpenFileName(self, 'OpenFile')
         #TODO add filename checker and handle case there is no lat-lon
-        self.flightdata_df = read_flightdata_csv(self.filename)
+        flightdata_df = read_flightdata_csv(self.filename)
 
-        if self.flightdata_df.empty:
+        if flightdata_df.empty:
             return
 
+        self.mplfigs_to_canvas(flightdata_df)
+        self.cntr_enabled = True
+
+
+    def cntr_run(self):
+        if not self.cntr_enabled:
+            return
+
+        for index in range(0, self.samples, samplerate):
+            self.rcd.update(index)
+            self.rcd.blit()
+
+            self.gd.update(index)
+            self.gd.blit()
+
+            self.md.update_location(index)
+            self.md.blit()
+
+            while self.md.pause:
+                self.md.blit()
+
+    def cntr_pause(self):
+        if not self.cntr_enabled:
+            return
+
+        self.md.pause = not self.md.pause
+
+    def cntr_quit(self):
+        self.close()
+        sys.exit()
+
+    def mplfigs_to_canvas(self, flightdata_df):
         if self.md:
             self.rcd.remove_fig()
             self.gd.remove_fig()
             self.md.remove_fig()
 
-        self.samples = len(self.flightdata_df)
-        self.rcd = RemoteControlDisplay(self.flightdata_df)
-        self.gd = GraphDisplay(self.flightdata_df)
-        self.md = MapDisplay(self.flightdata_df)
+        self.samples = len(flightdata_df)
+        self.rcd = RemoteControlDisplay(flightdata_df)
+        self.gd = GraphDisplay(flightdata_df)
+        self.md = MapDisplay(flightdata_df)
 
         md_canvas = FigureCanvas(self.md.fig)
         gd_canvas = FigureCanvas(self.gd.fig)
@@ -133,33 +166,6 @@ class DashboardShow(QWidget):
         self.md.on_resize(None)
         self.gd.on_resize(None)
         self.rcd.on_resize(None)
-
-    def cntr_run(self):
-        if self.flightdata_df is None:
-            return
-
-        for index in range(0, self.samples, samplerate):
-            self.rcd.update(index)
-            self.rcd.blit()
-
-            self.gd.update(index)
-            self.gd.blit()
-
-            self.md.update_location(index)
-            self.md.blit()
-
-            while self.md.pause:
-                self.md.blit()
-
-    def cntr_pause(self):
-        if self.flightdata_df is None:
-            return
-
-        self.md.pause = not self.md.pause
-
-    def cntr_quit(self):
-        self.close()
-        sys.exit()
 
 
 def main():
