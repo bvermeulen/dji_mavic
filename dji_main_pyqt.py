@@ -22,8 +22,8 @@ anticlockwise_symbol = '\u21b6'
 clockwise_symbol = '\u21b7'
 right_arrow_symbol = '\u25B6'
 left_arrow_symbol = '\u25C0'
-samplerate = 5
-
+samplerate = 3
+display_frequency = 10  # display is every 10 * 3 samples
 
 class DashboardShow(QWidget):
 
@@ -32,6 +32,9 @@ class DashboardShow(QWidget):
         self.md, self.gd, self.rcd = None, None, None
         self.samples = None
         self.cntr_enabled = False
+        self.avg_height, self.avg_speed, self.avg_distance = 0, 0, 0
+        self.display_counter = 0
+        self.display_frequency = 5
 
         self.md_stack = QStackedWidget(self)
         self.md_stack.addWidget(FigureCanvas(Figure()))
@@ -47,27 +50,26 @@ class DashboardShow(QWidget):
         self.setWindowTitle('DJI Mavic Pro ... ')
         self.show()
 
-
     def initUI(self):
         # main box
         mainbox = QVBoxLayout()
 
         # setup displays
-        self.hbox_displays = QHBoxLayout()
+        hbox_displays = QHBoxLayout()
 
         vbox_left = QVBoxLayout()
         vbox_left.addWidget(self.gd_stack)
         vbox_left.addWidget(self.rc_stack)
 
-        self.hbox_displays.addLayout(vbox_left)
-        self.hbox_displays.addWidget(self.md_stack)
+        hbox_displays.addLayout(vbox_left)
+        hbox_displays.addWidget(self.md_stack)
 
         # setup status line
         hbox_statusline = QHBoxLayout()
         hbox_statusline.setAlignment(QtCore.Qt.AlignLeft)
-        status_label = QLabel()
-        status_label.setText('Here come the text widgets for status ...')
-        hbox_statusline.addWidget(status_label)
+        self.status_label = QLabel()
+        self.status_label.setText(' status window ...')
+        hbox_statusline.addWidget(self.status_label)
 
         # setup buttons
         hbox_buttons = QHBoxLayout()
@@ -89,11 +91,38 @@ class DashboardShow(QWidget):
         quit_button.clicked.connect(self.cntr_quit)
         hbox_buttons.addWidget(quit_button)
 
-        mainbox.addLayout(self.hbox_displays)
+        mainbox.addLayout(hbox_displays)
         mainbox.addLayout(hbox_statusline)
         mainbox.addLayout(hbox_buttons)
 
         self.setLayout(mainbox)
+
+    def display_status(self, time_ms, height, speed, distance):
+        if self.display_counter == display_frequency:
+            t = (
+                f'{time_ms:5.0f}: '
+                f'{self.avg_height/ self.display_counter:4.0f} ft, '
+                f'{self.avg_speed / self.display_counter:4.0f} km/h, '
+                f'{self.avg_distance / self.display_counter:4.0f} meter'
+            )
+            self.status_label.setText(t)
+            self.avg_height = None
+            self.avg_speed = None
+            self.avg_distance = None
+            self.display_counter = 0
+
+        else:
+            if self.display_counter == 1:
+                self.avg_height = height
+                self.avg_speed = speed
+                self.avg_distance = distance
+
+            else:
+                self.avg_height += height
+                self.avg_speed += speed
+                self.avg_distance += distance
+
+        self.display_counter += 1
 
     def cntr_open(self):
         self.filename, _ = QFileDialog.getOpenFileName(self, 'OpenFile')
@@ -106,16 +135,22 @@ class DashboardShow(QWidget):
         self.mplfigs_to_canvas(flightdata_df)
         self.cntr_enabled = True
 
-
     def cntr_run(self):
         if not self.cntr_enabled:
             return
+
+        # display initial statys
+        self.display_counter = display_frequency
+        vals = self.gd.update(0)
+        self.display_status(*vals)
 
         for index in range(0, self.samples, samplerate):
             self.rcd.update(index)
             self.rcd.blit()
 
-            self.gd.update(index)
+            vals = self.gd.update(index)
+            self.display_status(*vals)
+
             self.gd.blit()
 
             self.md.update_location(index)

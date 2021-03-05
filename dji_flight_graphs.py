@@ -86,6 +86,11 @@ class GraphDisplay:
         self.graph_speed.set_data(self.fl_time[:index], self.fl_speed[:index],)
         self.graph_dist.set_data(self.fl_time[:index], self.fl_dist[:index],)
 
+        return (
+            self.fl_time[index], self.fl_height[index],
+            self.fl_speed[index], self.fl_dist[index],
+        )
+
     def blit(self):
         if self.background is None:
             self.background = (

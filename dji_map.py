@@ -19,6 +19,7 @@ homepoint_color = 'red'
 homepoint_size = 500
 drone_color = 'blue'
 drone_size = 15
+arial_limit = 150  # meter
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
 
 
@@ -47,7 +48,6 @@ class MapDisplay:
         ]
         flightpath_gpd = GeoDataFrame(geometry=self.flightpath)
         flightpath_gpd.crs = EPSG_OSM
-        print(flightpath_gpd.head(-100))
 
         # set the homepoint and convert to map projection
         homepoint_gpd = GeoDataFrame(geometry=[self.flightpoints[0]])
@@ -58,11 +58,22 @@ class MapDisplay:
         self.fig.canvas.set_window_title('Drone flightpath')
         self.fig.suptitle(None)
 
-        # plot the flightpath in grey and convert to map projection and add basemap
+        # plot the flightpath, homepoint
         flightpath_gpd.plot(ax=self.ax_map, color=flightpath_color)
         homepoint_gpd.plot(
             ax=self.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
+
+        # adjust map limits when necessary
+        xlimits = self.ax_map.get_xlim()
+        # if xlimits[1] - xlimits[0] < arial_limit * 2:
+        self.ax_map.set_xlim(xlimits[0] - arial_limit, xlimits[1] + arial_limit)
+
+        ylimits = self.ax_map.get_ylim()
+        # if ylimits[1] - ylimits[0] < arial_limit * 2:
+        self.ax_map.set_ylim(ylimits[0] - arial_limit, ylimits[1] + arial_limit)
+
+        # add the basemap
         self.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
         self.background = None
 
