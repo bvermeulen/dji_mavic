@@ -1,6 +1,9 @@
 ''' module for flightpath map for dji mavic pro
 '''
+import json
+from decouple import config
 import numpy as np
+from matplotlib import ticker
 import matplotlib.pyplot as plt
 from matplotlib import patches as mpl_patches
 import pyproj
@@ -11,16 +14,37 @@ from dji_mavic_io import read_flightdata_csv
 
 #pylint: disable=no-value-for-parameter
 
+
 fig_size = (6, 6)
 EPSG_WGS84 = 4326
 EPSG_OSM = 3857
-flightpath_color = 'grey'
+flightpath_color = 'yellow'
 homepoint_color = 'red'
 homepoint_size = 500
 drone_color = 'blue'
 drone_size = 15
 arial_limit = 150  # meter
+tick_intval = 500  # meter
 tr_wgs_osm = pyproj.Transformer.from_crs(EPSG_WGS84, EPSG_OSM)
+
+
+@ticker.FuncFormatter
+def major_formatter(x, pos):
+    ''' formatter to show only the last 4 digipythonts '''
+    return f'{x % 10_000:.0f}'
+
+
+def read_json_maptiler(json_file):
+    try:
+        with open(json_file) as f:
+            maptiler_source = json.load(f)
+            maptiler_source['url'] = ''.join([
+                maptiler_source['url'], '?key=', config('maptiler_api_key')
+            ])
+            return maptiler_source
+
+    except (KeyError, FileNotFoundError):
+        return None
 
 
 class MapDisplay:
@@ -58,6 +82,11 @@ class MapDisplay:
         self.fig.canvas.set_window_title('Drone flightpath')
         self.fig.suptitle(None)
 
+        self.ax_map.xaxis.set_major_formatter(major_formatter)
+        self.ax_map.yaxis.set_major_formatter(major_formatter)
+        self.ax_map.xaxis.set_major_locator(ticker.MultipleLocator(tick_intval))
+        self.ax_map.yaxis.set_major_locator(ticker.MultipleLocator(tick_intval))
+
         # plot the flightpath, homepoint
         flightpath_gpd.plot(ax=self.ax_map, color=flightpath_color)
         homepoint_gpd.plot(
@@ -84,7 +113,8 @@ class MapDisplay:
             self.ax_map.set_xlim(xc - dist, xc + dist)
 
         # add the basemap
-        self.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
+        # ctx.providers.Esri.WorldStreetMap
+        self.add_basemap_osm(source='maptiler_hybrid.json')
         self.background = None
 
         # add the drone
@@ -98,8 +128,19 @@ class MapDisplay:
         connect = self.fig.canvas.mpl_connect
         connect('resize_event', self.on_resize)
 
-    def add_basemap_osm(self, source=ctx.providers.OpenStreetMap.Mapnik):
-        ctx.add_basemap(self.ax_map, source=source)
+    def add_basemap_osm(self, source=None):
+        if source is None:
+            maptiler_source = ctx.providers.OpenStreetMap.Mapnik
+
+        elif isinstance(source, str):
+            maptiler_source = read_json_maptiler(source)
+            if not maptiler_source:
+                maptiler_source = ctx.providers.OpenStreetMap.Mapnik
+
+        else:
+            maptiler_source = source
+
+        ctx.add_basemap(self.ax_map, source=maptiler_source)
 
     def draw(self):
         self.fig.canvas.draw()

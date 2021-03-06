@@ -31,6 +31,7 @@ pyproj==3.0.0.post1
 PyQt5==5.15.2
 PyQt5-sip==12.8.1
 python-dateutil==2.8.1
+python-decouple==3.4
 pytz==2020.4
 rasterio==1.1.8
 requests==2.25.1
