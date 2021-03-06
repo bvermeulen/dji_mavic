@@ -64,14 +64,24 @@ class MapDisplay:
             ax=self.ax_map, marker='*', color=homepoint_color, markersize=homepoint_size
         )
 
-        # adjust map limits when necessary
-        xlimits = self.ax_map.get_xlim()
-        # if xlimits[1] - xlimits[0] < arial_limit * 2:
-        self.ax_map.set_xlim(xlimits[0] - arial_limit, xlimits[1] + arial_limit)
+        # adjust map limits to make x and y dimensions the same
+        xlimits = list(self.ax_map.get_xlim())
+        ylimits = list(self.ax_map.get_ylim())
+        if xlimits[1] - xlimits[0] > ylimits[1] - ylimits[0]:
+            xlimits[0] -= arial_limit
+            xlimits[1] += arial_limit
+            self.ax_map.set_xlim(xlimits[0], xlimits[1])
+            dist = 0.5 * (xlimits[1] - xlimits[0])
+            yc = 0.5 * (ylimits[1] + ylimits[0])
+            self.ax_map.set_ylim(yc - dist, yc + dist)
 
-        ylimits = self.ax_map.get_ylim()
-        # if ylimits[1] - ylimits[0] < arial_limit * 2:
-        self.ax_map.set_ylim(ylimits[0] - arial_limit, ylimits[1] + arial_limit)
+        else:
+            ylimits[0] -= arial_limit
+            ylimits[1] += arial_limit
+            self.ax_map.set_ylim(ylimits[0], ylimits[1])
+            dist = 0.5 * (ylimits[1] - ylimits[0])
+            xc = 0.5 * (xlimits[1] + xlimits[0])
+            self.ax_map.set_xlim(xc - dist, xc + dist)
 
         # add the basemap
         self.add_basemap_osm(source=ctx.providers.Esri.WorldStreetMap)
@@ -86,9 +96,7 @@ class MapDisplay:
 
         # make connections for key and figure resize
         connect = self.fig.canvas.mpl_connect
-        connect('key_press_event', self.on_key)
         connect('resize_event', self.on_resize)
-        self.pause = True
 
     def add_basemap_osm(self, source=ctx.providers.OpenStreetMap.Mapnik):
         ctx.add_basemap(self.ax_map, source=source)
@@ -113,13 +121,6 @@ class MapDisplay:
             self.fig.draw_artist(self.drone)
             self.fig.canvas.blit(self.fig.bbox)
             self.fig.canvas.flush_events()
-
-    def on_key(self, event):
-        if event.key == ' ':
-            self.pause = not self.pause
-
-        if event.key == 's':
-            self.fly_drone()
 
     def on_resize(self, event):
         self.background = None

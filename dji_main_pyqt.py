@@ -1,6 +1,7 @@
 ''' application to show dji mavic drone flights from UAV Drone csv files
 '''
 import sys
+from pathlib import Path
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5 import QtCore
@@ -34,7 +35,7 @@ class DashboardShow(QWidget):
         self.cntr_enabled = False
         self.avg_height, self.avg_speed, self.avg_distance = 0, 0, 0
         self.display_counter = 0
-        self.display_frequency = 5
+        self.loop_running = False
 
         self.md_stack = QStackedWidget(self)
         self.md_stack.addWidget(FigureCanvas(Figure()))
@@ -46,7 +47,7 @@ class DashboardShow(QWidget):
 
         self.initUI()
 
-        self.move(400, 300)
+        self.move(200, 100)
         self.setWindowTitle('DJI Mavic Pro ... ')
         self.show()
 
@@ -76,20 +77,33 @@ class DashboardShow(QWidget):
         hbox_buttons.setAlignment(QtCore.Qt.AlignLeft)
 
         selectfile_button = QPushButton('file')
+        selectfile_button.setFocusPolicy(QtCore.Qt.NoFocus)
         selectfile_button.clicked.connect(self.cntr_open)
         hbox_buttons.addWidget(selectfile_button)
 
         start_button = QPushButton('run')
+        start_button.setFocusPolicy(QtCore.Qt.NoFocus)
         start_button.clicked.connect(self.cntr_run)
         hbox_buttons.addWidget(start_button)
 
         pause_button = QPushButton('pause')
         pause_button.clicked.connect(self.cntr_pause)
+        pause_button.setFocusPolicy(QtCore.Qt.NoFocus)
         hbox_buttons.addWidget(pause_button)
+
+        stop_button = QPushButton('stop')
+        stop_button.clicked.connect(self.cntr_stop)
+        stop_button.setFocusPolicy(QtCore.Qt.NoFocus)
+        hbox_buttons.addWidget(stop_button)
 
         quit_button = QPushButton('quit')
         quit_button.clicked.connect(self.cntr_quit)
+        quit_button.setFocusPolicy(QtCore.Qt.NoFocus)
         hbox_buttons.addWidget(quit_button)
+
+        self.filename_label = QLabel()
+        self.filename_label.setText('file: ')
+        hbox_buttons.addWidget(self.filename_label)
 
         mainbox.addLayout(hbox_displays)
         mainbox.addLayout(hbox_statusline)
@@ -106,9 +120,9 @@ class DashboardShow(QWidget):
                 f'{self.avg_distance / self.display_counter:4.0f} meter'
             )
             self.status_label.setText(t)
-            self.avg_height = None
-            self.avg_speed = None
-            self.avg_distance = None
+            self.avg_height = 0
+            self.avg_speed = 0
+            self.avg_distance = 0
             self.display_counter = 0
 
         else:
@@ -125,15 +139,20 @@ class DashboardShow(QWidget):
         self.display_counter += 1
 
     def cntr_open(self):
-        self.filename, _ = QFileDialog.getOpenFileName(self, 'OpenFile')
-        #TODO add filename checker and handle case there is no lat-lon
-        flightdata_df = read_flightdata_csv(self.filename)
+        if self.loop_running:
+            return
+
+        filename, _ = QFileDialog.getOpenFileName(self, 'OpenFile')
+        filename = Path(filename)
+        flightdata_df = read_flightdata_csv(filename)
 
         if flightdata_df.empty:
             return
 
+        self.filename_label.setText(f'file: {filename.name}')
         self.mplfigs_to_canvas(flightdata_df)
         self.cntr_enabled = True
+        self.pause = False
 
     def cntr_run(self):
         if not self.cntr_enabled:
@@ -144,7 +163,11 @@ class DashboardShow(QWidget):
         vals = self.gd.update(0)
         self.display_status(*vals)
 
+        self.loop_running = True
         for index in range(0, self.samples, samplerate):
+            if not self.loop_running:
+                break
+
             self.rcd.update(index)
             self.rcd.blit()
 
@@ -156,18 +179,34 @@ class DashboardShow(QWidget):
             self.md.update_location(index)
             self.md.blit()
 
-            while self.md.pause:
+            while self.pause:
                 self.md.blit()
+                if not self.loop_running:
+                    break
+
+        self.loop_running = False
 
     def cntr_pause(self):
         if not self.cntr_enabled:
             return
 
-        self.md.pause = not self.md.pause
+        self.pause = not self.pause
+
+    def cntr_stop(self):
+        if not self.cntr_enabled:
+            return
+
+        self.loop_running = False
+        self.cntr_enabled = False
 
     def cntr_quit(self):
         self.close()
         sys.exit()
+
+    def keyPressEvent(self, event):
+        # if spacebar pressed pause
+        if event.key() == 32:
+            self.pause = not self.pause
 
     def mplfigs_to_canvas(self, flightdata_df):
         if self.md:

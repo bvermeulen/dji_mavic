@@ -53,7 +53,7 @@ flightdata_keys = [
     'message',
 ]
 
-filename = 'dji_mavic_test_data.csv'
+filename = 'dji_mavic_test_data_2.csv'
 
 def read_flightdata_csv(file_name: str) -> pd.DataFrame:
     ''' read Airdata UAV - csv flightdata
@@ -65,21 +65,19 @@ def read_flightdata_csv(file_name: str) -> pd.DataFrame:
     '''
     empty_df = pd.DataFrame()
     try:
-        flightdata_df = pd.read_csv(file_name)
+        flightdata_df = pd.read_csv(
+            file_name, skiprows=1, header=None, names=flightdata_keys, index_col=False,
+        )
 
     except Exception as e:
         print(f'unable to read {file_name}, error message: {e}')
         return empty_df
 
-    for key in flightdata_df.keys():
-        if key not in flightdata_keys:
-            print(f'unable to read {file_name}, '
-                  f'key "{key}" does not match Airdata UAV header')
-            return empty_df
-
-        # stop checking after the last 'official' key
-        if key == 'message':
-            break
+    # replace possible initial zero values for lat and long
+    flightdata_df['latitude'] = flightdata_df['latitude'].replace(
+        0, flightdata_df['latitude'][(flightdata_df != 0)['latitude'].idxmax()])
+    flightdata_df['longitude'] = flightdata_df['longitude'].replace(
+        0, flightdata_df['longitude'][(flightdata_df != 0)['longitude'].idxmax()])
 
     # returns flightdata dataframe, note it may not contain
     # all the keys
