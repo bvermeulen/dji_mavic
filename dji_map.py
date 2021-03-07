@@ -39,7 +39,7 @@ def read_json_maptiler(json_file):
         with open(json_file) as f:
             maptiler_source = json.load(f)
             maptiler_source['url'] = ''.join([
-                maptiler_source['url'], '?key=', config('maptiler_api_key')
+                maptiler_source['url'], '?key=', config('MAPTILER_API_KEY')
             ])
             return maptiler_source
 
