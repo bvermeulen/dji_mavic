@@ -26,6 +26,7 @@ left_arrow_symbol = '\u25C0'
 samplerate = 3
 display_frequency = 10  # display is every 10 * 3 samples
 
+
 class DashboardShow(QWidget):
 
     def __init__(self):
@@ -197,7 +198,6 @@ class DashboardShow(QWidget):
             return
 
         self.loop_running = False
-        self.cntr_enabled = False
 
     def cntr_quit(self):
         self.close()

@@ -29,10 +29,6 @@ bar_width = 5
 title_left = 'climb/ yaw'
 title_right = 'pitch/ roll'
 
-rc_max = 1684
-rc_min = 364
-rc_zero = 1024
-
 
 def conv_xy_to_polar(x, y):
     return np.degrees(np.arctan2(y, x)), np.sqrt(x*x + y*y)

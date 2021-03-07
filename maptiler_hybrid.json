@@ -1,0 +1,11 @@
+{   "tilejson":"2.0.0",
+    "name":"Satellite Hybrid",
+    "attribution": "(C) maptiler.com",
+    "minzoom":0,
+    "maxzoom":22,
+    "bounds":[-180,-85.0511,180,85.0511],
+    "format":"jpg","type":"baselayer",
+    "center":[0,0,0],
+    "color":"transparent",
+    "url":"https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg"
+}
